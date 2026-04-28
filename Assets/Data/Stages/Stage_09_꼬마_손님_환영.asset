@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 919b356d9dd3ad14fa3a47003447d775, type: 3}
+  m_Name: "Stage_09_\uAF2C\uB9C8_\uC190\uB2D8_\uD658\uC601"
+  m_EditorClassIdentifier: Assembly-CSharp::StageData
+  stageName: "\uAF2C\uB9C8 \uC190\uB2D8 \uD658\uC601!"
+  allowLeft: 0
+  allowRight: 0
+  allowBottom: 1
+  forcedCustomerType: 3
+  randomizeCustomerType: 0
+  spawnInterval: 4
+  serveLeftTarget: 0
+  serveRightTarget: 0
+  serveBottomTarget: 1
+  trashTarget: 0
+  comboTarget: 0
+  specialGuestTarget: 0
+  serveTotalTarget: 0
+  forceSpecialOnAllSlots: 1
+  isInfiniteMode: 0
+  timeLimit: 0
