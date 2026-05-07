@@ -31,9 +31,22 @@ public class ServingManager : MonoBehaviour
 
     private void Awake()
     {
-        if (iceMachine == null) iceMachine = FindAnyObjectByType<IceMachine>();
+        if (iceMachine == null) iceMachine = ResolveActiveIceMachine();
         if (customerManager == null) customerManager = FindAnyObjectByType<CustomerManager>();
         if (scoreManager == null) scoreManager = FindAnyObjectByType<ScoreManager>();
+    }
+
+    private static IceMachine ResolveActiveIceMachine()
+    {
+        var all = FindObjectsOfType<IceMachine>(true);
+        IceMachine fallback = null;
+        for (int i = 0; i < all.Length; i++)
+        {
+            if (all[i] == null) continue;
+            if (fallback == null) fallback = all[i];
+            if (all[i].isActiveAndEnabled) return all[i];
+        }
+        return fallback;
     }
 
     /// <summary>

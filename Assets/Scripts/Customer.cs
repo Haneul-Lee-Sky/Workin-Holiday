@@ -146,6 +146,7 @@ public class Customer : MonoBehaviour
         orderData = new ShavedIceData();
         orderData.iceTaps = 5;
         orderData.isComplete = true;
+        orderData.totalToppings = requiredToppings;
 
         int[] toppings = { 0, 1, 2 };
 

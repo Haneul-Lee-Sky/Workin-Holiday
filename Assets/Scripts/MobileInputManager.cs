@@ -46,18 +46,15 @@ public class MobileInputManager : MonoBehaviour
     private int lastScreenHeight;
 
     // 포인터 추적
-    private Vector2 pointerDownPos;
-    private bool isPointerDown = false;
-    private ScreenZone pointerDownZone;
-    // Down 때 사용한 정확한 디바이스를 기억해서 Up 이벤트를 동일 디바이스에서 추적한다.
-    // (Pointer.current 는 Mouse↔Touchscreen 간에 프레임마다 바뀔 수 있어 Up 이벤트를 놓칠 수 있음)
-    private Pointer activeDownPointer;
-    private float pointerDownTime;
-    private const float POINTER_DOWN_TIMEOUT = 2f; // 안전장치 — 2초 이상 Down 상태면 강제 취소
+    // Center swipe만 Down/Up을 추적하고, Bottom 탭(얼음 추가)은 Press 프레임에 즉시 처리합니다.
+    private bool isCenterDown = false;
+    private Vector2 centerDownPos;
+    private Pointer centerDownPointer;
 
     // UI Raycast 재사용
     private PointerEventData pointerEventData;
     private List<RaycastResult> raycastResults = new List<RaycastResult>();
+    private RectTransform cachedIceBuildWindowRt;
 
     // 재사용 버퍼 — 활성 포인터 디바이스 수집
     private readonly List<Pointer> activePointers = new List<Pointer>(4);
@@ -65,13 +62,28 @@ public class MobileInputManager : MonoBehaviour
     private void Awake()
     {
         if (iceMachine == null)
-            iceMachine = FindAnyObjectByType<IceMachine>();
+            iceMachine = ResolveActiveIceMachine();
         if (servingManager == null)
             servingManager = FindAnyObjectByType<ServingManager>();
         if (gameManager == null)
             gameManager = FindAnyObjectByType<GameManager>();
 
         RefreshBoundaries();
+    }
+
+    private static IceMachine ResolveActiveIceMachine()
+    {
+        // Scene may contain multiple IceMachine components (some disabled).
+        // Prefer the one that is active+enabled so input updates the visible UI.
+        var all = FindObjectsOfType<IceMachine>(true);
+        IceMachine fallback = null;
+        for (int i = 0; i < all.Length; i++)
+        {
+            if (all[i] == null) continue;
+            if (fallback == null) fallback = all[i];
+            if (all[i].isActiveAndEnabled) return all[i];
+        }
+        return fallback;
     }
 
     private void OnEnable()
@@ -141,33 +153,29 @@ public class MobileInputManager : MonoBehaviour
         if (Touchscreen.current != null) activePointers.Add(Touchscreen.current);
         if (activePointers.Count == 0) return;
 
-        // 이미 눌린 상태라면, Down 때 사용한 디바이스의 Release 만 추적한다.
-        if (isPointerDown)
+        // Center swipe release 처리
+        if (isCenterDown)
         {
-            // 디바이스가 사라졌거나 타임아웃이면 강제 해제 (프레임 드롭/씬 전환 보호)
-            bool deviceLost = activeDownPointer == null || !activeDownPointer.added;
-            bool timedOut = Time.unscaledTime - pointerDownTime > POINTER_DOWN_TIMEOUT;
-
-            if (deviceLost || timedOut)
+            bool deviceLost = centerDownPointer == null || !centerDownPointer.added;
+            if (deviceLost)
             {
-                if (enableInputLog)
-                    Debug.Log($"[MobileInputManager] Pointer Down 상태를 안전 해제 (deviceLost={deviceLost}, timedOut={timedOut})");
-                isPointerDown = false;
-                activeDownPointer = null;
+                isCenterDown = false;
+                centerDownPointer = null;
                 return;
             }
 
-            if (activeDownPointer.press.wasReleasedThisFrame)
+            if (centerDownPointer.press.wasReleasedThisFrame)
             {
-                Vector2 endPos = activeDownPointer.position.ReadValue();
-                isPointerDown = false;
-                Pointer usedPointer = activeDownPointer;
-                activeDownPointer = null;
+                Vector2 endPos = centerDownPointer.position.ReadValue();
+                isCenterDown = false;
+                Pointer usedPointer = centerDownPointer;
+                centerDownPointer = null;
                 if (enableInputLog)
-                    Debug.Log($"[MobileInputManager] Pointer Up @ {endPos} → DispatchInput({pointerDownZone}) (device: {usedPointer.GetType().Name})");
-                DispatchInput(pointerDownZone, pointerDownPos, endPos);
+                    Debug.Log($"[MobileInputManager] Pointer Up @ {endPos} → DispatchInput(Center) (device: {usedPointer.GetType().Name})");
+                DispatchInput(ScreenZone.Center, centerDownPos, endPos);
             }
-            return; // 이미 눌린 상태에서는 새 Press 를 받지 않는다
+            // Center swipe 중에는 추가 Press를 받지 않음
+            return;
         }
 
         // 새 Press 탐색 — Touchscreen 을 Mouse 보다 먼저 확인해 Simulator 우선.
@@ -177,14 +185,48 @@ public class MobileInputManager : MonoBehaviour
             Pointer p = activePointers[i];
             if (p.press.wasPressedThisFrame)
             {
-                pointerDownPos = p.position.ReadValue();
-                pointerDownZone = ClassifyZone(pointerDownPos);
-                isPointerDown = true;
-                activeDownPointer = p;
-                pointerDownTime = Time.unscaledTime;
+                Vector2 downPos = p.position.ReadValue();
+                ScreenZone zone = ClassifyZone(downPos);
                 if (enableInputLog)
-                    Debug.Log($"[MobileInputManager] Pointer Down @ {pointerDownPos} → Zone: {pointerDownZone} (device: {p.GetType().Name})");
-                break;
+                    Debug.Log($"[MobileInputManager] Pointer Down @ {downPos} → Zone: {zone} (device: {p.GetType().Name})");
+
+                // Bottom 탭: 즉시 얼음 추가 (버튼 위 제외)
+                if (zone == ScreenZone.Bottom)
+                {
+                    if (IsOverUIButton(downPos)) return;
+                    if (iceMachine == null) iceMachine = ResolveActiveIceMachine();
+                    if (iceMachine != null && !iceMachine.IsComplete)
+                    {
+                        if (enableInputLog) Debug.Log("[하단 영역] 탭 → 얼음 생성");
+                        iceMachine.AddIce();
+                    }
+                    return;
+                }
+
+                // Center: 얼음창 탭이면 즉시 얼음 추가, 아니면 swipe 추적 시작
+                if (zone == ScreenZone.Center)
+                {
+                    if (!IsOverUIButton(downPos) && IsOverIceBuildWindow(downPos))
+                    {
+                        if (iceMachine == null) iceMachine = ResolveActiveIceMachine();
+                        if (iceMachine != null && !iceMachine.IsComplete)
+                        {
+                            if (enableInputLog) Debug.Log("[중앙 영역] 얼음창 탭 → 얼음 생성");
+                            iceMachine.AddIce();
+                        }
+                        return;
+                    }
+
+                    // swipe 추적 시작
+                    isCenterDown = true;
+                    centerDownPos = downPos;
+                    centerDownPointer = p;
+                    return;
+                }
+
+                // Top은 차단
+                OnTopZoneInput();
+                return;
             }
         }
     }
@@ -277,22 +319,7 @@ public class MobileInputManager : MonoBehaviour
         // UI 버튼 위의 탭은 UGUI EventSystem이 처리
         if (IsOverUIButton(startPos))
             return;
-
-        if (iceMachine == null)
-        {
-            Debug.LogWarning("[MobileInputManager] IceMachine 참조가 없습니다!");
-            return;
-        }
-
-        if (!iceMachine.IsComplete)
-        {
-            iceMachine.AddIce();
-        }
-        else
-        {
-            if (enableInputLog)
-                Debug.Log("[하단 영역] 빙수 완성! 토핑 버튼을 터치하거나 중앙에서 스와이프하여 서빙하세요.");
-        }
+        // 얼음 생성은 IceTapArea(Panel_IceBuildWindow)가 담당합니다.
     }
 
     // ─────────────────────────────────────
@@ -341,6 +368,25 @@ public class MobileInputManager : MonoBehaviour
                 return true;
         }
         return false;
+    }
+
+    private bool IsOverIceBuildWindow(Vector2 screenPos)
+    {
+        // UI RaycastTarget 설정에 영향을 받지 않도록 RectTransform 영역 체크를 우선 사용합니다.
+        if (cachedIceBuildWindowRt == null)
+        {
+            var go = GameObject.Find("Panel_IceBuildWindow");
+            if (go != null) cachedIceBuildWindowRt = go.GetComponent<RectTransform>();
+        }
+
+        if (cachedIceBuildWindowRt == null) return false;
+
+        var canvas = cachedIceBuildWindowRt.GetComponentInParent<Canvas>();
+        Camera cam = null;
+        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            cam = canvas.worldCamera;
+
+        return RectTransformUtility.RectangleContainsScreenPoint(cachedIceBuildWindowRt, screenPos, cam);
     }
 
     /// <summary>

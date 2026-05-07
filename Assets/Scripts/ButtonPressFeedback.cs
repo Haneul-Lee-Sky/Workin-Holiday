@@ -83,6 +83,11 @@ public class ButtonPressFeedback : MonoBehaviour,
         }
     }
 
+    public void ForceRelease()
+    {
+        if (isPressed) ApplyReleased();
+    }
+
     /// <summary>
     /// 버튼에 ButtonPressFeedback이 없으면 자동 부착합니다.
     /// RaycastTarget도 함께 보정합니다.
@@ -96,5 +101,12 @@ public class ButtonPressFeedback : MonoBehaviour,
 
         if (btn.GetComponent<ButtonPressFeedback>() == null)
             btn.gameObject.AddComponent<ButtonPressFeedback>();
+    }
+
+    public static void ForceRelease(Button btn)
+    {
+        if (btn == null) return;
+        var fb = btn.GetComponent<ButtonPressFeedback>();
+        if (fb != null) fb.ForceRelease();
     }
 }

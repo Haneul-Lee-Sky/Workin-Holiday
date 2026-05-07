@@ -36,6 +36,8 @@ public class CustomerManager : MonoBehaviour
     [SerializeField] private Transform customerMountParent;
     [Tooltip("Table 바깥 스폰 거리 = max(가로,세로 월드) × 이 배수. 값이 클수록 멀리서 등장합니다.")]
     [SerializeField] private float approachDistanceFromTable = 1.2f;
+    [Tooltip("손님이 테이블에 너무 딱 붙지 않도록, 테이블 가장자리(Edge)로부터 바깥 방향으로 떨어지는 거리(월드 단위).")]
+    [SerializeField] private float stopOffsetFromTableEdge = 0.28f;
 
     [Header("Timer")]
     [Tooltip("손님이 슬롯에 도착한 후 기다리는 시간(초). 걸어오는 시간은 제외됩니다.")]
@@ -145,7 +147,7 @@ public class CustomerManager : MonoBehaviour
             {
                 Vector3 edgeMid = (c0 + c1) * 0.5f;
                 Vector3 outward = (edgeMid - center).normalized;
-                endWorld = edgeMid;
+                endWorld = edgeMid + outward * stopOffsetFromTableEdge;
                 startWorld = edgeMid + outward * outwardDistance;
                 return true;
             }
@@ -153,7 +155,7 @@ public class CustomerManager : MonoBehaviour
             {
                 Vector3 edgeMid = (c2 + c3) * 0.5f;
                 Vector3 outward = (edgeMid - center).normalized;
-                endWorld = edgeMid;
+                endWorld = edgeMid + outward * stopOffsetFromTableEdge;
                 startWorld = edgeMid + outward * outwardDistance;
                 return true;
             }
@@ -161,13 +163,53 @@ public class CustomerManager : MonoBehaviour
             {
                 Vector3 edgeMid = (c0 + c3) * 0.5f;
                 Vector3 outward = (edgeMid - center).normalized;
-                endWorld = edgeMid;
+                endWorld = edgeMid + outward * stopOffsetFromTableEdge;
                 startWorld = edgeMid + outward * outwardDistance;
                 return true;
             }
             default:
                 return false;
         }
+    }
+
+    private static void ApplyFacing(ServingManager.ServeDirection direction, Transform customerRoot)
+    {
+        if (customerRoot == null) return;
+
+        bool? flipX = null;
+        switch (direction)
+        {
+            // Left: 왼쪽에서 오른쪽으로 걸어오므로 오른쪽(+)을 바라보게
+            case ServingManager.ServeDirection.Left:
+                flipX = false;
+                break;
+
+            // Right: 오른쪽에서 왼쪽으로 걸어오므로 좌우 반전(-)으로 왼쪽을 바라보게
+            case ServingManager.ServeDirection.Right:
+                flipX = true;
+                break;
+
+            default:
+                break;
+        }
+
+        if (flipX == null) return;
+
+        var sprites = customerRoot.GetComponentsInChildren<SpriteRenderer>(true);
+        if (sprites != null && sprites.Length > 0)
+        {
+            for (int i = 0; i < sprites.Length; i++)
+            {
+                if (sprites[i] != null)
+                    sprites[i].flipX = flipX.Value;
+            }
+            return;
+        }
+
+        // 폴백: 스프라이트가 없을 때만 루트 스케일 반전
+        Vector3 s = customerRoot.localScale;
+        float absX = Mathf.Abs(s.x);
+        customerRoot.localScale = new Vector3(flipX.Value ? -absX : absX, s.y, s.z);
     }
 
     // ─────────────────────────────────────
@@ -232,6 +274,7 @@ public class CustomerManager : MonoBehaviour
             custObj = Instantiate(customerPrefab);
             Transform ct = custObj.transform;
             ct.SetPositionAndRotation(startPos, Quaternion.identity);
+            ApplyFacing(direction, ct);
             if (mount != null)
             {
                 ct.SetParent(mount, true);
@@ -242,6 +285,7 @@ public class CustomerManager : MonoBehaviour
         {
             custObj = CreateCustomerUI(direction, type);
             custObj.transform.SetPositionAndRotation(startPos, Quaternion.identity);
+            ApplyFacing(direction, custObj.transform);
             if (mount != null)
                 custObj.transform.SetParent(mount, true);
         }
@@ -262,11 +306,30 @@ public class CustomerManager : MonoBehaviour
         // 만료 이벤트 구독
         customer.OnExpired += HandleCustomerExpired;
 
-        // UI 텍스트 연결 (임시 프리팹)
-        if (customerPrefab == null)
+        // UI 텍스트 연결 (프리팹/임시 모두 시도)
         {
-            UnityEngine.UI.Text txt = custObj.GetComponentInChildren<UnityEngine.UI.Text>();
-            if (txt != null) customer.SetupUI(txt);
+            UnityEngine.UI.Text txt = custObj.GetComponentInChildren<UnityEngine.UI.Text>(true);
+            if (txt != null)
+            {
+                customer.SetupUI(txt);
+            }
+            else
+            {
+                // TMP가 있을 수도 있어 런타임 타입으로 시도 (패키지 의존성 없이)
+                var tmpType = Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro");
+                if (tmpType != null)
+                {
+                    var tmp = custObj.GetComponentInChildren(tmpType, true);
+                    if (tmp != null)
+                    {
+                        // Customer는 UnityEngine.UI.Text 기반이므로, TMP가 있으면 직접 텍스트만 갱신하는 폴백
+                        // (주문 갱신은 Customer.RefreshBubbleView에서 수행)
+                        // 여기서는 Customer 내부 참조가 없으니, 최소한 비어있지 않게 초기화만 합니다.
+                        var prop = tmpType.GetProperty("text");
+                        if (prop != null) prop.SetValue(tmp, "주문:\n(생성중)");
+                    }
+                }
+            }
         }
 
         // 주문 생성
