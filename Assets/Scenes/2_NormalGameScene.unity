@@ -284,7 +284,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 423782651}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -953,6 +953,7 @@ GameObject:
   - component: {fileID: 1061269621}
   - component: {fileID: 1061269626}
   - component: {fileID: 1061269625}
+  - component: {fileID: 1061269627}
   m_Layer: 0
   m_Name: Panel_IceBuildWindow
   m_TagString: Untagged
@@ -1020,7 +1021,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.3882353}
+  m_Color: {r: 1, g: 1, b: 1, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1099,6 +1100,19 @@ MonoBehaviour:
   toppingsAlphaWhileBuildingIce: 0.35
   toppingsAlphaWhenReady: 1
   maxTotalToppings: 10
+--- !u!114 &1061269627
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1061269619}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d86c6c50a8725904a9c8e54ffba7d129, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IceTapArea
+  iceMachine: {fileID: 1061269626}
 --- !u!1 &1111023223
 GameObject:
   m_ObjectHideFlags: 0
