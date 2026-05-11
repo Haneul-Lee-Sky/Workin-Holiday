@@ -28,6 +28,9 @@ public class IceMachine : MonoBehaviour
     [Tooltip("얼음이 완성되어 토핑을 올려야 할 때의 투명도")]
     [SerializeField, Range(0f, 1f)] private float toppingsAlphaWhenReady = 1f;
 
+    [Header("Debug (optional)")]
+    [SerializeField] private bool debugLogToppingsUI = false;
+
     private CanvasGroup toppingsCanvasGroup;
 
     [Header("Toppings Limit")]
@@ -201,6 +204,15 @@ public class IceMachine : MonoBehaviour
             if (milkButton != null) milkButton.interactable = ready;
             if (fruitButton != null) fruitButton.interactable = ready;
 
+            if (debugLogToppingsUI)
+            {
+                Debug.Log(
+                    $"[IceMachine] SetToppingsReady({ready}) " +
+                    $"alpha={toppingsCanvasGroup.alpha} interactable={toppingsCanvasGroup.interactable} blocksRaycasts={toppingsCanvasGroup.blocksRaycasts} " +
+                    $"buttons: red={redBeanButton?.interactable} milk={milkButton?.interactable} fruit={fruitButton?.interactable} " +
+                    $"ice: {currentIceTaps}/{maxIceTaps}");
+            }
+
             // 입력/레이캐스트가 꺼졌다 켜질 때 ButtonPressFeedback이 "눌린 상태"로 남아
             // 특정 버튼(팥 등)만 어둡게 고정되는 케이스를 방지합니다.
             ButtonPressFeedback.ForceRelease(redBeanButton);
@@ -237,6 +249,10 @@ public class IceMachine : MonoBehaviour
         if (IsComplete)
         {
             Debug.Log($"[IceMachine] ★ 빙수 베이스 완성! ({currentIceTaps}/{maxIceTaps}) — 토핑을 추가하거나 서빙하세요.");
+            if (debugLogToppingsUI)
+            {
+                Debug.Log($"[IceMachine] Calling SetToppingsReady(true) while building taps={currentIceTaps}/{maxIceTaps}");
+            }
             SetToppingsReady(true);
             OnIceCompleted?.Invoke();
         }
@@ -302,6 +318,10 @@ public class IceMachine : MonoBehaviour
         toppingsAdded[2] = false;
         totalToppingsAdded = 0;
         RefreshVisuals();
+        if (debugLogToppingsUI)
+        {
+            Debug.Log($"[IceMachine] ResetIce() -> calling SetToppingsReady(false)");
+        }
         SetToppingsReady(false);
         OnIceReset?.Invoke();
     }
