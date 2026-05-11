@@ -131,11 +131,14 @@ public class IceMachine : MonoBehaviour
     private static void NormalizeButtonGraphic(Button btn)
     {
         if (btn == null) return;
-        Graphic g = btn.targetGraphic != null ? btn.targetGraphic : btn.GetComponent<Graphic>();
-        if (g == null) return;
-        var c = g.color;
-        // RGB는 유지하되, 알파만 1로 강제
-        g.color = new Color(c.r, c.g, c.b, 1f);
+        // 버튼·아이콘·자식 텍스트 등 모든 Graphic 알파를 1로 맞춤 (패널 CanvasGroup으로만 반투명 처리)
+        foreach (var g in btn.GetComponentsInChildren<Graphic>(true))
+        {
+            var c = g.color;
+            g.color = new Color(c.r, c.g, c.b, 1f);
+        }
+        // Normalize 이후에도 ButtonPressFeedback이 Awake 때 잡아둔 originalColor로 되돌리지 않도록 동기화
+        ButtonPressFeedback.RefreshOriginalFor(btn);
     }
 
     private static void EnsureFeedback(Button btn)
