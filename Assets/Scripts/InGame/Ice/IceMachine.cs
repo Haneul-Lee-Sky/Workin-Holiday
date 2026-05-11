@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System;
+using System.Collections.Generic;
 
 /// <summary>
 /// 빙수 제조기 - 얼음 생성(5탭) 및 토핑 관리 전담
@@ -131,12 +132,25 @@ public class IceMachine : MonoBehaviour
     private static void NormalizeButtonGraphic(Button btn)
     {
         if (btn == null) return;
-        // 버튼·아이콘·자식 텍스트 등 모든 Graphic 알파를 1로 맞춤 (패널 CanvasGroup으로만 반투명 처리)
+        // 버튼은 자식 구조가 케이스마다 다를 수 있어,
+        // Button.targetGraphic(예: Group 아래 sibling 아이콘)과 btn 자식 그래픽을 모두 함께 정규화합니다.
+        var graphics = new HashSet<Graphic>();
+
+        if (btn.targetGraphic != null)
+            graphics.Add(btn.targetGraphic);
+
         foreach (var g in btn.GetComponentsInChildren<Graphic>(true))
+        {
+            if (g != null) graphics.Add(g);
+        }
+
+        // 패널 CanvasGroup으로만 반투명 처리되도록, 개별 Graphic 알파를 1로 복구
+        foreach (var g in graphics)
         {
             var c = g.color;
             g.color = new Color(c.r, c.g, c.b, 1f);
         }
+
         // Normalize 이후에도 ButtonPressFeedback이 Awake 때 잡아둔 originalColor로 되돌리지 않도록 동기화
         ButtonPressFeedback.RefreshOriginalFor(btn);
     }

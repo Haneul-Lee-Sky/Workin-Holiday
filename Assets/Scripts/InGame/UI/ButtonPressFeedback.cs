@@ -32,6 +32,10 @@ public class ButtonPressFeedback : MonoBehaviour,
         if (targetGraphic != null)
         {
             originalColor = targetGraphic.color;
+            // CanvasGroup로 투명도(반투명/선명)를 제어하는 구조이므로,
+            // 버튼 개별 Graphic의 알파는 항상 1로 고정합니다.
+            // (disabled/tint 상태에서 Awake가 캡처되면 팥 버튼처럼 일부만 반투명으로 남는 문제가 생길 수 있음)
+            originalColor.a = 1f;
         }
 
         // Button의 기본 ColorTint가 우리 색상 변경과 충돌하지 않도록 전환을 끕니다.
@@ -95,6 +99,7 @@ public class ButtonPressFeedback : MonoBehaviour,
     {
         if (targetGraphic == null) return;
         originalColor = targetGraphic.color;
+        originalColor.a = 1f;
     }
 
     public static void RefreshOriginalFor(Button btn)
