@@ -18,28 +18,45 @@ public class ButtonPressFeedback : MonoBehaviour,
     [Tooltip("누른 동안 곱해질 RGB 배율 (1 미만이면 어두워짐)")]
     [SerializeField, Range(0.3f, 1f)] private float darkenFactor = 0.75f;
 
+    [Tooltip("체크 해제 시 눌림 중 색만 바꾸지 않습니다(스케일 피드백만). 토핑처럼 CanvasGroup 알파와 겹치면 팥만 흐려 보일 수 있어 끕니다.")]
+    [SerializeField] private bool darkenColorOnPress = true;
+
     private Button button;
     private Graphic targetGraphic;
     private Vector3 originalScale;
     private Color originalColor;
     private bool isPressed;
+    /// <summary>Awake가 끝나기 전에 컴포넌트만 제거되면 originalColor 등이 기본값이라 OnDisable에서 그래픽을 망가뜨릴 수 있음</summary>
+    private bool visualsInitialized;
 
     private void Awake()
     {
         button = GetComponent<Button>();
         targetGraphic = button.targetGraphic != null ? button.targetGraphic : GetComponent<Graphic>();
-        originalScale = transform.localScale;
+        CacheOriginalScale();
         if (targetGraphic != null)
-        {
             originalColor = targetGraphic.color;
-            // CanvasGroup로 투명도(반투명/선명)를 제어하는 구조이므로,
-            // 버튼 개별 Graphic의 알파는 항상 1로 고정합니다.
-            // (disabled/tint 상태에서 Awake가 캡처되면 팥 버튼처럼 일부만 반투명으로 남는 문제가 생길 수 있음)
-            originalColor.a = 1f;
-        }
 
         // Button의 기본 ColorTint가 우리 색상 변경과 충돌하지 않도록 전환을 끕니다.
         button.transition = Selectable.Transition.None;
+        visualsInitialized = true;
+    }
+
+    private void OnEnable()
+    {
+        // HorizontalLayoutGroup 등 적용 전 Awake에서 scale이 (0,0,0)으로 잡히는 경우가 있어 재캐시합니다.
+        if (button == null) button = GetComponent<Button>();
+        if (targetGraphic == null && button != null)
+            targetGraphic = button.targetGraphic != null ? button.targetGraphic : GetComponent<Graphic>();
+        if (!isPressed)
+            CacheOriginalScale();
+    }
+
+    private void CacheOriginalScale()
+    {
+        originalScale = transform.localScale;
+        if (originalScale.sqrMagnitude < 1e-6f)
+            originalScale = Vector3.one;
     }
 
     public void OnPointerDown(PointerEventData eventData)
@@ -60,14 +77,17 @@ public class ButtonPressFeedback : MonoBehaviour,
 
     private void OnDisable()
     {
-        if (isPressed) ApplyReleased();
+        // Awake 전에 DestroyImmediate 되면 originalColor=(0,0,0,0) 등으로 Image를 망가뜨릴 수 있음
+        if (!visualsInitialized) return;
+        // 비활성화 시에도 눌림 색/스케일이 남지 않도록 항상 원복
+        ResetVisualToOriginal();
     }
 
     private void ApplyPressed()
     {
         isPressed = true;
         transform.localScale = originalScale * pressedScale;
-        if (targetGraphic != null)
+        if (targetGraphic != null && darkenColorOnPress)
         {
             targetGraphic.color = new Color(
                 originalColor.r * darkenFactor,
@@ -77,19 +97,39 @@ public class ButtonPressFeedback : MonoBehaviour,
         }
     }
 
+    /// <summary>
+    /// 토핑 UI 등 CanvasGroup 알파와 겹칠 때는 색 어둡게 하지 않고 스케일만 쓰는 것이 안전합니다.
+    /// </summary>
+    public void SetDarkenColorOnPress(bool value)
+    {
+        darkenColorOnPress = value;
+        RefreshOriginalColorFromTarget();
+        if (!isPressed && targetGraphic != null)
+            targetGraphic.color = originalColor;
+    }
+
     private void ApplyReleased()
     {
+        ResetVisualToOriginal();
+    }
+
+    /// <summary>
+    /// isPressed 플래그와 무관하게 스케일/색을 저장값으로 되돌립니다.
+    /// (PointerUp이 누락되면 isPressed만 false인 채 색이 어둡게 남는 경우 방지)
+    /// </summary>
+    private void ResetVisualToOriginal()
+    {
         isPressed = false;
+        if (originalScale.sqrMagnitude < 1e-6f)
+            originalScale = Vector3.one;
         transform.localScale = originalScale;
         if (targetGraphic != null)
-        {
             targetGraphic.color = originalColor;
-        }
     }
 
     public void ForceRelease()
     {
-        if (isPressed) ApplyReleased();
+        ResetVisualToOriginal();
     }
 
     /// <summary>
@@ -97,9 +137,18 @@ public class ButtonPressFeedback : MonoBehaviour,
     /// </summary>
     public void RefreshOriginalColorFromTarget()
     {
+        // 눌림 중이 아닐 때만 스케일 기준을 갱신 (눌린 축소 스케일을 원본으로 저장하지 않도록)
+        if (!isPressed)
+        {
+            var s = transform.localScale;
+            if (s.sqrMagnitude > 1e-6f)
+                originalScale = s;
+            else
+                originalScale = Vector3.one;
+        }
+
         if (targetGraphic == null) return;
         originalColor = targetGraphic.color;
-        originalColor.a = 1f;
     }
 
     public static void RefreshOriginalFor(Button btn)

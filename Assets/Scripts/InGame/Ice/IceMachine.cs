@@ -28,9 +28,6 @@ public class IceMachine : MonoBehaviour
     [Tooltip("얼음이 완성되어 토핑을 올려야 할 때의 투명도")]
     [SerializeField, Range(0f, 1f)] private float toppingsAlphaWhenReady = 1f;
 
-    [Header("Debug (optional)")]
-    [SerializeField] private bool debugLogToppingsUI = false;
-
     private CanvasGroup toppingsCanvasGroup;
 
     [Header("Toppings Limit")]
@@ -121,69 +118,94 @@ public class IceMachine : MonoBehaviour
         if (milkButton != null) milkButton.onClick.AddListener(() => AddTopping(ToppingType.Milk));
         if (fruitButton != null) fruitButton.onClick.AddListener(() => AddTopping(ToppingType.Fruit));
 
-        // 어떤 이유로든 아이콘 색/알파가 씬 저장값으로 틀어져 있으면 원복합니다.
+        RefreshToppingButtonPresentation();
+    }
+
+    private void Start()
+    {
+        // 다른 Awake가 토핑 쪽을 건드린 뒤에도 한 번 더 맞춤 + 플레이 중 스크립트 저장 직후 재진입 시에도 반영
+        RefreshToppingButtonPresentation();
+    }
+
+    /// <summary>
+    /// 토핑 버튼은 CanvasGroup 알파만으로 비활성/반투명을 표현합니다.
+    /// ButtonPressFeedback / ColorTint 전환이 Image.color를 덮어쓰면 팥만 유난히 흐려 보일 수 있어 제거·고정합니다.
+    /// </summary>
+    private void RefreshToppingButtonPresentation()
+    {
+        StripPressFeedbackFromToppingButton(redBeanButton);
+        StripPressFeedbackFromToppingButton(milkButton);
+        StripPressFeedbackFromToppingButton(fruitButton);
+
         NormalizeButtonGraphic(redBeanButton);
         NormalizeButtonGraphic(milkButton);
         NormalizeButtonGraphic(fruitButton);
-
-        // 터치 피드백 컴포넌트 자동 부착 (없을 때만)
-        EnsureFeedback(redBeanButton);
-        EnsureFeedback(milkButton);
-        EnsureFeedback(fruitButton);
     }
 
     private static void NormalizeButtonGraphic(Button btn)
     {
         if (btn == null) return;
-        // 버튼은 자식 구조가 케이스마다 다를 수 있어,
-        // Button.targetGraphic(예: Group 아래 sibling 아이콘)과 btn 자식 그래픽을 모두 함께 정규화합니다.
-        var graphics = new HashSet<Graphic>();
 
+        // targetGraphic + 이 버튼 오브젝트 하위의 Graphic만 정규화 (형제/부모 패널 전체 스캔은 하지 않음)
+        var graphics = new HashSet<Graphic>();
         if (btn.targetGraphic != null)
             graphics.Add(btn.targetGraphic);
-
         foreach (var g in btn.GetComponentsInChildren<Graphic>(true))
         {
             if (g != null) graphics.Add(g);
         }
 
-        // 버튼과 아이콘이 sibling 구조일 수 있으므로, 부모 컨테이너 기준으로도 한 번 더 수집합니다.
-        if (btn.transform != null && btn.transform.parent != null)
-        {
-            foreach (var g in btn.transform.parent.GetComponentsInChildren<Graphic>(true))
-            {
-                if (g != null) graphics.Add(g);
-            }
-        }
-
-        // 패널 CanvasGroup으로만 반투명 처리되도록, 개별 Graphic 알파를 1로 복구
         foreach (var g in graphics)
         {
             var c = g.color;
             g.color = new Color(c.r, c.g, c.b, 1f);
         }
 
-        // Normalize 이후에도 ButtonPressFeedback이 Awake 때 잡아둔 originalColor로 되돌리지 않도록 동기화
-        ButtonPressFeedback.RefreshOriginalFor(btn);
+        // Transition.None은 환경에 따라 그래픽 알파가 깨지는 사례가 있어,
+        // ColorTint를 쓰되 Normal/Pressed 등을 모두 같은 색으로 맞춰 "틴트 없음"과 동일하게 둡니다.
+        ApplyNeutralColorTint(btn);
+
+        var fb = btn.GetComponent<ButtonPressFeedback>();
+        if (fb != null)
+            fb.RefreshOriginalColorFromTarget();
     }
 
-    private static void EnsureFeedback(Button btn)
+    private static void ApplyNeutralColorTint(Button btn)
+    {
+        Graphic g = btn.targetGraphic != null ? btn.targetGraphic : btn.GetComponent<Graphic>();
+        Color n = g != null ? g.color : Color.white;
+        n.a = 1f;
+        var block = btn.colors;
+        block.normalColor = n;
+        block.highlightedColor = n;
+        block.pressedColor = n;
+        block.selectedColor = n;
+        block.disabledColor = n;
+        block.colorMultiplier = 1f;
+        block.fadeDuration = 0f;
+        btn.colors = block;
+        btn.transition = Selectable.Transition.ColorTint;
+    }
+
+    /// <summary>
+    /// 토핑 전용: ButtonPressFeedback은 제거만 하고 새로 붙이지 않습니다.
+    /// </summary>
+    private static void StripPressFeedbackFromToppingButton(Button btn)
     {
         if (btn == null) return;
 
-        // 포인터 이벤트가 오려면 targetGraphic의 raycastTarget이 켜져 있어야 합니다.
-        // 씬에 따라 Image의 RaycastTarget이 꺼진 채로 저장된 경우가 있어 런타임에서 보정합니다.
         Graphic targetGraphic = btn.targetGraphic != null
             ? btn.targetGraphic
             : btn.GetComponent<Graphic>();
         if (targetGraphic != null && !targetGraphic.raycastTarget)
-        {
             targetGraphic.raycastTarget = true;
-        }
 
-        if (btn.GetComponent<ButtonPressFeedback>() == null)
+        var feedback = btn.GetComponent<ButtonPressFeedback>();
+        if (feedback != null)
         {
-            btn.gameObject.AddComponent<ButtonPressFeedback>();
+            // 제거 직전 눌림 상태를 풀어 두면 OnDisable/원복이 안전합니다.
+            feedback.ForceRelease();
+            UnityEngine.Object.DestroyImmediate(feedback);
         }
     }
 
@@ -192,34 +214,21 @@ public class IceMachine : MonoBehaviour
     /// </summary>
     private void SetToppingsReady(bool ready)
     {
+        EnsureToppingsCanvasGroup();
+
         if (toppingsCanvasGroup != null)
         {
             toppingsCanvasGroup.alpha = ready ? toppingsAlphaWhenReady : toppingsAlphaWhileBuildingIce;
-            // CanvasGroup의 interactable 상태/버튼 상태가 섞이면 특정 버튼만 disabled tint(알파 반영)로 남을 수 있어,
-            // 여기서는 버튼별 interactable을 명시적으로 강제합니다.
-            toppingsCanvasGroup.interactable = ready;
+            // interactable을 ready에 따라 껐다 켜면 Unity의 Disabled tint(DisabledColor 알파)이 적용될 수 있어
+            // "비활성 -> 투명"이 아닌 "알파는 CanvasGroup alpha로만" 제어하도록 interactable은 항상 true로 둡니다.
+            toppingsCanvasGroup.interactable = true;
             toppingsCanvasGroup.blocksRaycasts = ready;
 
-            if (redBeanButton != null) redBeanButton.interactable = ready;
-            if (milkButton != null) milkButton.interactable = ready;
-            if (fruitButton != null) fruitButton.interactable = ready;
+            if (redBeanButton != null) redBeanButton.interactable = true;
+            if (milkButton != null) milkButton.interactable = true;
+            if (fruitButton != null) fruitButton.interactable = true;
 
-            if (debugLogToppingsUI)
-            {
-                Debug.Log(
-                    $"[IceMachine] SetToppingsReady({ready}) " +
-                    $"alpha={toppingsCanvasGroup.alpha} interactable={toppingsCanvasGroup.interactable} blocksRaycasts={toppingsCanvasGroup.blocksRaycasts} " +
-                    $"buttons: red={redBeanButton?.interactable} milk={milkButton?.interactable} fruit={fruitButton?.interactable} " +
-                    $"ice: {currentIceTaps}/{maxIceTaps}");
-            }
-
-            // 입력/레이캐스트가 꺼졌다 켜질 때 ButtonPressFeedback이 "눌린 상태"로 남아
-            // 특정 버튼(팥 등)만 어둡게 고정되는 케이스를 방지합니다.
-            ButtonPressFeedback.ForceRelease(redBeanButton);
-            ButtonPressFeedback.ForceRelease(milkButton);
-            ButtonPressFeedback.ForceRelease(fruitButton);
-
-            // 혹시 Graphic 알파가 틀어진 경우도 다시 원복
+            // 토핑 아이콘은 ButtonPressFeedback 없이 운용 — Graphic 알파만 정규화
             NormalizeButtonGraphic(redBeanButton);
             NormalizeButtonGraphic(milkButton);
             NormalizeButtonGraphic(fruitButton);
@@ -228,6 +237,21 @@ public class IceMachine : MonoBehaviour
         {
             // CanvasGroup이 없는 예외 상황: 최소한 표시 여부만 토글
             toppingsPanel.SetActive(ready);
+        }
+    }
+
+    private void EnsureToppingsCanvasGroup()
+    {
+        if (toppingsPanel == null)
+        {
+            var go = GameObject.Find("Panel_Toppings_Bottom");
+            if (go != null) toppingsPanel = go;
+        }
+        if (toppingsPanel != null && toppingsCanvasGroup == null)
+        {
+            toppingsCanvasGroup = toppingsPanel.GetComponent<CanvasGroup>();
+            if (toppingsCanvasGroup == null)
+                toppingsCanvasGroup = toppingsPanel.AddComponent<CanvasGroup>();
         }
     }
 
@@ -249,10 +273,6 @@ public class IceMachine : MonoBehaviour
         if (IsComplete)
         {
             Debug.Log($"[IceMachine] ★ 빙수 베이스 완성! ({currentIceTaps}/{maxIceTaps}) — 토핑을 추가하거나 서빙하세요.");
-            if (debugLogToppingsUI)
-            {
-                Debug.Log($"[IceMachine] Calling SetToppingsReady(true) while building taps={currentIceTaps}/{maxIceTaps}");
-            }
             SetToppingsReady(true);
             OnIceCompleted?.Invoke();
         }
@@ -318,10 +338,6 @@ public class IceMachine : MonoBehaviour
         toppingsAdded[2] = false;
         totalToppingsAdded = 0;
         RefreshVisuals();
-        if (debugLogToppingsUI)
-        {
-            Debug.Log($"[IceMachine] ResetIce() -> calling SetToppingsReady(false)");
-        }
         SetToppingsReady(false);
         OnIceReset?.Invoke();
     }
