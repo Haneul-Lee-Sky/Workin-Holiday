@@ -89,6 +89,22 @@ public class ButtonPressFeedback : MonoBehaviour,
     }
 
     /// <summary>
+    /// 외부에서 Image.color 등을 수정한 뒤 호출하면, 릴리즈 시 다시 덮어쓰는 저장 색을 현재 그래픽과 맞춥니다.
+    /// </summary>
+    public void RefreshOriginalColorFromTarget()
+    {
+        if (targetGraphic == null) return;
+        originalColor = targetGraphic.color;
+    }
+
+    public static void RefreshOriginalFor(Button btn)
+    {
+        if (btn == null) return;
+        var fb = btn.GetComponent<ButtonPressFeedback>();
+        if (fb != null) fb.RefreshOriginalColorFromTarget();
+    }
+
+    /// <summary>
     /// 버튼에 ButtonPressFeedback이 없으면 자동 부착합니다.
     /// RaycastTarget도 함께 보정합니다.
     /// </summary>
