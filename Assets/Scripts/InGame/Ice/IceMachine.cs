@@ -144,6 +144,15 @@ public class IceMachine : MonoBehaviour
             if (g != null) graphics.Add(g);
         }
 
+        // 버튼과 아이콘이 sibling 구조일 수 있으므로, 부모 컨테이너 기준으로도 한 번 더 수집합니다.
+        if (btn.transform != null && btn.transform.parent != null)
+        {
+            foreach (var g in btn.transform.parent.GetComponentsInChildren<Graphic>(true))
+            {
+                if (g != null) graphics.Add(g);
+            }
+        }
+
         // 패널 CanvasGroup으로만 반투명 처리되도록, 개별 Graphic 알파를 1로 복구
         foreach (var g in graphics)
         {
@@ -183,10 +192,14 @@ public class IceMachine : MonoBehaviour
         if (toppingsCanvasGroup != null)
         {
             toppingsCanvasGroup.alpha = ready ? toppingsAlphaWhenReady : toppingsAlphaWhileBuildingIce;
-            // interactable=false 이면 Button disabled tint로 어두워질 수 있어
-            // 클릭만 막고(레이캐스트 차단) 색감은 유지합니다.
-            toppingsCanvasGroup.interactable = true;
+            // CanvasGroup의 interactable 상태/버튼 상태가 섞이면 특정 버튼만 disabled tint(알파 반영)로 남을 수 있어,
+            // 여기서는 버튼별 interactable을 명시적으로 강제합니다.
+            toppingsCanvasGroup.interactable = ready;
             toppingsCanvasGroup.blocksRaycasts = ready;
+
+            if (redBeanButton != null) redBeanButton.interactable = ready;
+            if (milkButton != null) milkButton.interactable = ready;
+            if (fruitButton != null) fruitButton.interactable = ready;
 
             // 입력/레이캐스트가 꺼졌다 켜질 때 ButtonPressFeedback이 "눌린 상태"로 남아
             // 특정 버튼(팥 등)만 어둡게 고정되는 케이스를 방지합니다.
