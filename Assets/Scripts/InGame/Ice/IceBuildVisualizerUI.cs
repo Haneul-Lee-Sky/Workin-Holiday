@@ -40,6 +40,10 @@ public class IceBuildVisualizerUI : MonoBehaviour
 
     [Header("Topping Stack On Ice")]
     [SerializeField] private float toppingIconSize = 56f;
+    [Tooltip("얼음 위에 쌓일 때만 적용. 스프라이트 여백 때문에 팥만 작아 보이면 1보다 크게(예: 1.1~1.2)")]
+    [SerializeField, Range(0.5f, 2f)] private float stackVisualScaleRedBean = 1f;
+    [SerializeField, Range(0.5f, 2f)] private float stackVisualScaleMilk = 1f;
+    [SerializeField, Range(0.5f, 2f)] private float stackVisualScaleFruit = 1f;
     [SerializeField] private float toppingBaseYOffset = 78f;
     [SerializeField] private float toppingStackStepY = 22f;
     [Tooltip("체크 시 토핑을 항상 정중앙에만 쌓습니다.")]
@@ -298,7 +302,7 @@ public class IceBuildVisualizerUI : MonoBehaviour
     {
         if (toppingsContainer == null) return;
         var sprite = iceMachine != null ? iceMachine.GetToppingSpriteForUI(type) : null;
-        AddToppingOnIce(sprite, $"Topping_{type}_{toppingVisualCount}");
+        AddToppingOnIce(sprite, type, $"Topping_{type}_{toppingVisualCount}");
     }
 
     private void HandleIceReset()
@@ -460,10 +464,24 @@ public class IceBuildVisualizerUI : MonoBehaviour
         }
     }
 
-    private void AddToppingOnIce(Sprite sprite, string name)
+    private static float GetStackVisualScale(IceMachine.ToppingType type, float red, float milk, float fruit)
+    {
+        switch (type)
+        {
+            case IceMachine.ToppingType.RedBean: return red;
+            case IceMachine.ToppingType.Milk: return milk;
+            case IceMachine.ToppingType.Fruit: return fruit;
+            default: return 1f;
+        }
+    }
+
+    private void AddToppingOnIce(Sprite sprite, IceMachine.ToppingType type, string name)
     {
         if (toppingsContainer == null) return;
         if (sprite == null) return;
+
+        float sizeMul = GetStackVisualScale(type, stackVisualScaleRedBean, stackVisualScaleMilk, stackVisualScaleFruit);
+        float cell = toppingIconSize * sizeMul;
 
         float y = toppingBaseYOffset + toppingVisualCount * toppingStackStepY;
         float x = 0f;
@@ -483,7 +501,7 @@ public class IceBuildVisualizerUI : MonoBehaviour
         rt.anchorMax = new Vector2(0.5f, 0f);
         rt.pivot = new Vector2(0.5f, 0f);
         rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(toppingIconSize, toppingIconSize);
+        rt.sizeDelta = new Vector2(cell, cell);
 
         var img = go.GetComponent<Image>();
         img.sprite = sprite;
