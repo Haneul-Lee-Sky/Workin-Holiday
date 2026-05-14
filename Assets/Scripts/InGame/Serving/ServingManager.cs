@@ -38,7 +38,7 @@ public class ServingManager : MonoBehaviour
 
     private static IceMachine ResolveActiveIceMachine()
     {
-        var all = FindObjectsOfType<IceMachine>(true);
+        var all = FindObjectsByType<IceMachine>(FindObjectsInactive.Include);
         IceMachine fallback = null;
         for (int i = 0; i < all.Length; i++)
         {

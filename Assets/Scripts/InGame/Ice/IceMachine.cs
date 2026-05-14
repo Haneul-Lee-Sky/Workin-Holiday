@@ -38,6 +38,8 @@ public class IceMachine : MonoBehaviour
     private int currentIceTaps = 0;
     private bool[] toppingsAdded = new bool[3]; // RedBean, Milk, Fruit
     private int totalToppingsAdded = 0;
+    /// <summary>IceTapArea(UI)와 MobileInputManager(Input System)가 같은 프레임에 각각 AddIce를 호출하는 경우 방지.</summary>
+    private int lastAddIceFrame = -1;
 
     // 이벤트: 얼음 완성 시 토핑 버튼 활성화 알림
     public event Action OnIceCompleted;
@@ -249,12 +251,16 @@ public class IceMachine : MonoBehaviour
     /// </summary>
     public bool AddIce()
     {
+        if (Time.frameCount == lastAddIceFrame)
+            return false;
+
         if (IsComplete)
         {
             Debug.Log($"[IceMachine] 이미 빙수가 완성되었습니다. 토핑을 추가하거나 서빙하세요. ({currentIceTaps}/{maxIceTaps})");
             return false;
         }
 
+        lastAddIceFrame = Time.frameCount;
         currentIceTaps++;
         RefreshVisuals();
         OnIceTapAdded?.Invoke(currentIceTaps, maxIceTaps);
@@ -321,6 +327,7 @@ public class IceMachine : MonoBehaviour
     /// </summary>
     public void ResetIce()
     {
+        lastAddIceFrame = -1;
         currentIceTaps = 0;
         toppingsAdded[0] = false;
         toppingsAdded[1] = false;

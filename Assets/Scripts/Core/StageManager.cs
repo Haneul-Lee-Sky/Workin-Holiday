@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using System;
+using System.Collections;
 
 /// <summary>
 /// 스테이지 매니저 — 전체 스테이지 흐름을 관리하고 각 매니저를 오케스트레이션
@@ -306,8 +307,16 @@ public class StageManager : MonoBehaviour
             Debug.Log($"[StageManager] 무한 모드 종료! 최종 점수: {score}, 매출: {revenue}원");
             OnInfiniteModeDone?.Invoke(score, revenue);
 
-            // 클리어 연출 시간 후 로비로 복귀
-            Invoke(nameof(ReturnToLobby), clearDelaySeconds);
+            // EndGame() 직후 Time.timeScale == 0 이므로 Invoke(스케일 시간)은 영원히 호출되지 않음.
+            // 실시간 대기 후 로비로 복귀합니다.
+            StartCoroutine(CoReturnToLobbyAfterRealtimeDelay(clearDelaySeconds));
         }
+    }
+
+    private IEnumerator CoReturnToLobbyAfterRealtimeDelay(float delaySeconds)
+    {
+        if (delaySeconds > 0f)
+            yield return new WaitForSecondsRealtime(delaySeconds);
+        ReturnToLobby();
     }
 }
