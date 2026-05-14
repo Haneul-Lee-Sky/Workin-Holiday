@@ -498,7 +498,7 @@ MonoBehaviour:
   m_TrackedDevicePositionAction: {fileID: 6564999863303420839, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
   m_TrackedDeviceOrientationAction: {fileID: 7970375526676320489, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
   m_DeselectOnBackgroundClick: 1
-  m_PointerBehavior: 0
+  m_PointerBehavior: 2
   m_CursorLockBehavior: 0
   m_ScrollDeltaPerTick: 6
 --- !u!114 &544744878
@@ -1016,7 +1016,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1061269619}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -1353,9 +1353,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a619f84769afbb47bf933488901d662, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ServingManager
-  iceMachine: {fileID: 0}
-  customerManager: {fileID: 0}
-  scoreManager: {fileID: 0}
+  iceMachine: {fileID: 1061269626}
+  customerManager: {fileID: 1213537353}
+  scoreManager: {fileID: 1213537354}
   baseRevenuePerServe: 500
 --- !u!114 &1213537351
 MonoBehaviour:
@@ -1369,9 +1369,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bcfebeef09cafd8478e7d838175b94c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MobileInputManager
-  iceMachine: {fileID: 0}
-  servingManager: {fileID: 0}
-  gameManager: {fileID: 0}
+  iceMachine: {fileID: 1061269626}
+  servingManager: {fileID: 1213537349}
+  gameManager: {fileID: 1418479317}
   bottomZoneRatio: 0.33333334
   centerZoneRatio: 0.33333334
   minSwipeDistance: 50
@@ -1403,9 +1403,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e9acde1abd0a6044828cb7fbd184413, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CustomerManager
-  gameManager: {fileID: 0}
-  scoreManager: {fileID: 0}
-  servingManager: {fileID: 0}
+  gameManager: {fileID: 1418479317}
+  scoreManager: {fileID: 1213537354}
+  servingManager: {fileID: 1213537349}
   leftSlot: {fileID: 779679778}
   rightSlot: {fileID: 397954054}
   bottomSlot: {fileID: 287744249}
@@ -3032,8 +3032,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: -9, y: -167}
-  m_SizeDelta: {x: 120.8, y: 211.4}
+  m_AnchoredPosition: {x: -9, y: -175}
+  m_SizeDelta: {x: 115, y: 200}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2073671663
 MonoBehaviour:

@@ -31,6 +31,52 @@ public class CustomerManager : MonoBehaviour
     [Header("Prefabs")]
     [SerializeField] private GameObject customerPrefab;
 
+    [Header("손님 주문 UI (여기에 넣으면 전 손님에 적용)")]
+    [Tooltip("좌측 슬롯 손님 말풍선. 비우면 아래 기본 말풍선을 사용합니다.")]
+    [SerializeField] private Sprite speechBubbleFrameSpriteLeft;
+    [Tooltip("우측 슬롯 손님 말풍선. 비우면 아래 기본 말풍선을 사용합니다.")]
+    [SerializeField] private Sprite speechBubbleFrameSpriteRight;
+    [Tooltip("하단 슬롯 손님 말풍선. 비우면 아래 기본 말풍선을 사용합니다.")]
+    [SerializeField] private Sprite speechBubbleFrameSpriteDown;
+    [Tooltip("하단 손님용 두 번째 말풍선(꼬리 반대 방향 등). 위 Down 과 둘 다 넣으면 하단 스폰마다 번갈아 적용됩니다.")]
+    [SerializeField] private Sprite speechBubbleFrameSpriteDownVariant;
+    [Tooltip("방향별 칸이 비었을 때 쓰는 말풍선. 모두 비우면 흰색 박스.")]
+    [SerializeField] private Sprite speechBubbleFrameSprite;
+    [Tooltip("주문 아이콘 — 팥. 비우면 Customer 컴포넌트 또는 IceMachine 토핑 버튼 스프라이트.")]
+    [SerializeField] private Sprite orderToppingIconRedBean;
+    [SerializeField] private Sprite orderToppingIconMilk;
+    [SerializeField] private Sprite orderToppingIconFruit;
+
+    [Header("말풍선 위치 (BubbleBox 앵커드 포지션, 캔버스 로컬)")]
+    [SerializeField] private Vector2 speechBubbleAnchoredPositionLeft = new Vector2(0f, 140f);
+    [SerializeField] private Vector2 speechBubbleAnchoredPositionRight = new Vector2(0f, 140f);
+    [Tooltip("하단 손님: 왼쪽에 말풍선이 붙는 케이스의 BubbleBox 앵커 위치. 스폰마다 왼쪽/오른쪽이 번갈아 적용됩니다.")]
+    [SerializeField] private Vector2 speechBubbleAnchoredPositionDownLeft = new Vector2(-200f, 10f);
+    [Tooltip("하단 손님: 오른쪽에 말풍선이 붙는 케이스의 BubbleBox 앵커 위치.")]
+    [SerializeField] private Vector2 speechBubbleAnchoredPositionDownRight = new Vector2(200f, 10f);
+
+    [Header("NPC 말풍선 캔버스 루트 오프셋 (SpeechBubbleCanvas localPosition)")]
+    [SerializeField] private Vector3 speechBubbleHostLocalOffsetLeft;
+    [SerializeField] private Vector3 speechBubbleHostLocalOffsetRight;
+    [Tooltip("하단: 왼쪽 배치 스폰일 때 SpeechBubbleCanvas localPosition. (0,0,0)이면 아래 레거시 필드 사용.")]
+    [SerializeField] private Vector3 speechBubbleHostLocalOffsetDownLeft;
+    [Tooltip("하단: 오른쪽 배치 스폰일 때 SpeechBubbleCanvas localPosition.")]
+    [SerializeField] private Vector3 speechBubbleHostLocalOffsetDownRight;
+    [Tooltip("하단 전용. 위 Left/Right 가 모두 (0,0,0)일 때만 적용됩니다.")]
+    [SerializeField] private Vector3 speechBubbleHostLocalOffsetDown;
+
+    [Header("하단 말풍선 방향 보정 (BubbleBox) — 왼쪽/오른쪽 배치 각각")]
+    [Tooltip("하단 손님 · 왼쪽 배치(번갈 0번)일 때 BubbleBox X 미러")]
+    [SerializeField] private bool speechBubbleFlipXForDownLeft;
+    [Tooltip("하단 손님 · 오른쪽 배치(번갈 1번)일 때 BubbleBox X 미러")]
+    [SerializeField] private bool speechBubbleFlipXForDownRight;
+    [SerializeField] private bool speechBubbleFlipYForDownLeft;
+    [SerializeField] private bool speechBubbleFlipYForDownRight;
+    [Range(-180f, 180f)]
+    [SerializeField] private float speechBubbleRotationZForDownLeft;
+    [Range(-180f, 180f)]
+    [SerializeField] private float speechBubbleRotationZForDownRight;
+
     [Header("Customer mount (UI)")]
     [Tooltip("손님 프리팹(NPC)의 부모. 비우면 씬에서 Panel_Maker_Center/Table 을 찾습니다. CustomerSlots가 아닌 테이블 위에 붙습니다.")]
     [SerializeField] private Transform customerMountParent;
@@ -45,6 +91,16 @@ public class CustomerManager : MonoBehaviour
 
     private Dictionary<ServingManager.ServeDirection, Customer> activeCustomers =
         new Dictionary<ServingManager.ServeDirection, Customer>();
+
+    /// <summary>하단 손님 스폰 한 번에 Build/Apply 가 두 번 Resolve 하므로, Down 말풍선 선택을 한 번만 계산합니다.</summary>
+    private Sprite cachedDownSpeechBubbleSprite;
+    private bool cachedDownSpeechBubbleResolved;
+
+    /// <summary>이번 하단 스폰에서 0=왼쪽 배치, 1=오른쪽 배치. Down/Variant 말풍선 스프라이트와 같은 패리티.</summary>
+    private int thisSpawnDownSideIndex;
+
+    /// <summary>하단 손님 왼쪽/오른쪽 배치 번갈이 카운터.</summary>
+    private int downSpawnSideCounter;
 
     public event Action<Customer> OnCustomerExpired;
     public event Action<Customer> OnCustomerSpawned;
@@ -94,35 +150,61 @@ public class CustomerManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 손님 NPC를 Panel_Maker_Center 하위 Table 에 붙이기 위한 부모 Transform 을 찾습니다.
+    /// 손님 NPC 부모를 Table 직속으로 맞춥니다.
+    /// Ice/PC 등 Table 하위에 붙이면 World Space UI·스프라이트가 얼음 패널 레이캐스트를 가려 2/5 이후 탭이 막히는 현상이 납니다.
     /// </summary>
     private void ResolveCustomerMountParent()
     {
-        if (customerMountParent != null) return;
-
-        var panel = GameObject.Find("Panel_Maker_Center");
-        if (panel == null)
-        {
-            Debug.LogWarning("[CustomerManager] 'Panel_Maker_Center' 를 찾을 수 없습니다. 손님은 기존처럼 CustomerSlots 하위에 붙습니다.");
-            return;
-        }
-
-        Transform table = panel.transform.Find("Table");
+        Transform table = FindTableUnderMakerCenter();
         if (table == null)
         {
-            Debug.LogWarning("[CustomerManager] 'Panel_Maker_Center/Table' 을 찾을 수 없습니다. 손님은 기존처럼 CustomerSlots 하위에 붙습니다.");
+            if (customerMountParent == null)
+                Debug.LogWarning("[CustomerManager] 'Panel_Maker_Center/Table' 을 찾을 수 없습니다. 손님은 스폰 포인트 부모 하위에 붙습니다.");
             return;
         }
 
-        customerMountParent = table;
-        Debug.Log("[CustomerManager] 손님 부모를 'Panel_Maker_Center/Table' 로 설정했습니다.");
+        if (customerMountParent == null)
+        {
+            customerMountParent = table;
+            Debug.Log("[CustomerManager] 손님 부모를 'Panel_Maker_Center/Table' 로 설정했습니다.");
+            return;
+        }
+
+        if (customerMountParent == table)
+            return;
+
+        if (customerMountParent.IsChildOf(table))
+        {
+            Debug.LogWarning(
+                $"[CustomerManager] customerMountParent가 Table 하위 '{customerMountParent.name}' 로 지정되어 있어 Table 루트로 교정합니다. (얼음/하단 UI 입력 가림 방지)");
+            customerMountParent = table;
+            return;
+        }
+
+        // Panel_Maker_Center 밖의 커스텀 부모는 그대로 둡니다.
+    }
+
+    private static Transform FindTableUnderMakerCenter()
+    {
+        var panel = GameObject.Find("Panel_Maker_Center");
+        return panel != null ? panel.transform.Find("Table") : null;
     }
 
     private Transform GetCustomerMountTransform(Transform spawnPoint)
     {
-        if (customerMountParent != null)
-            return customerMountParent;
-        return spawnPoint != null ? spawnPoint.parent : null;
+        Transform mount = customerMountParent != null
+            ? customerMountParent
+            : (spawnPoint != null ? spawnPoint.parent : null);
+
+        // 슬롯이 실수로 Ice 아래에 있으면 손님이 Ice 자식이 되어 전체 하단 입력을 가립니다.
+        if (mount != null && mount.name == "Ice")
+        {
+            Transform table = FindTableUnderMakerCenter();
+            if (table != null)
+                return table;
+        }
+
+        return mount;
     }
 
     /// <summary>
@@ -231,6 +313,14 @@ public class CustomerManager : MonoBehaviour
     {
         if (activeCustomers.ContainsKey(direction)) return;
 
+        cachedDownSpeechBubbleResolved = false;
+
+        if (direction == ServingManager.ServeDirection.Down)
+        {
+            thisSpawnDownSideIndex = downSpawnSideCounter % 2;
+            downSpawnSideCounter++;
+        }
+
         ResolveCustomerMountParent();
         TryAdoptPrefabFromSpawnManagerIfNeeded();
 
@@ -287,7 +377,10 @@ public class CustomerManager : MonoBehaviour
             custObj.transform.SetPositionAndRotation(startPos, Quaternion.identity);
             ApplyFacing(direction, custObj.transform);
             if (mount != null)
+            {
                 custObj.transform.SetParent(mount, true);
+                custObj.transform.SetAsLastSibling();
+            }
         }
 
         Customer customer = custObj.GetComponent<Customer>();
@@ -309,6 +402,12 @@ public class CustomerManager : MonoBehaviour
         // 스프라이트 전용 NPC 프리팹 등 Text가 없으면 주문이 절대 안 보임 → 말풍선 UI를 붙입니다.
         TryBindSpeechBubbleText(custObj, direction, customer);
 
+        ApplySpeechBubbleFrameIfAssigned(custObj, direction);
+        customer.ApplyOrderIconSourcesFromManager(
+            orderToppingIconRedBean,
+            orderToppingIconMilk,
+            orderToppingIconFruit);
+
         // World Space 손님 UI는 메인 Screen Space - Camera Canvas(-100 등)와 별도 정렬이라
         // 배경/패널 뒤로 밀릴 수 있음 → Sort Order를 올립니다.
         EnsureCustomerWorldCanvasRendersOnTop(custObj.transform);
@@ -322,6 +421,8 @@ public class CustomerManager : MonoBehaviour
 
         // 스폰 이벤트 — QuestManager가 구독해 특수 손님 등장 카운트에 사용
         OnCustomerSpawned?.Invoke(customer);
+
+        cachedDownSpeechBubbleResolved = false;
     }
 
     /// <summary>
@@ -436,10 +537,86 @@ public class CustomerManager : MonoBehaviour
             customer.SetupUI(txt);
     }
 
+    private Sprite ResolveSpeechBubbleFrameForDirection(ServingManager.ServeDirection direction)
+    {
+        switch (direction)
+        {
+            case ServingManager.ServeDirection.Left:
+                if (speechBubbleFrameSpriteLeft != null) return speechBubbleFrameSpriteLeft;
+                break;
+            case ServingManager.ServeDirection.Right:
+                if (speechBubbleFrameSpriteRight != null) return speechBubbleFrameSpriteRight;
+                break;
+            case ServingManager.ServeDirection.Down:
+                if (!cachedDownSpeechBubbleResolved)
+                {
+                    cachedDownSpeechBubbleSprite = PickDownSpeechBubbleFrameSprite();
+                    cachedDownSpeechBubbleResolved = true;
+                }
+
+                if (cachedDownSpeechBubbleSprite != null) return cachedDownSpeechBubbleSprite;
+                break;
+        }
+
+        return speechBubbleFrameSprite;
+    }
+
+    private Sprite PickDownSpeechBubbleFrameSprite()
+    {
+        Sprite primary = speechBubbleFrameSpriteDown;
+        Sprite variant = speechBubbleFrameSpriteDownVariant;
+
+        if (primary != null && variant != null)
+            return thisSpawnDownSideIndex == 0 ? primary : variant;
+
+        if (primary != null) return primary;
+        if (variant != null) return variant;
+        return null;
+    }
+
+    private static void ApplyImageSpriteAndSlicedType(UnityEngine.UI.Image img, Sprite spr)
+    {
+        if (img == null || spr == null) return;
+        img.sprite = spr;
+        Vector4 b = spr.border;
+        bool useSliced = b.x > 0f || b.y > 0f || b.z > 0f || b.w > 0f;
+        img.type = useSliced ? UnityEngine.UI.Image.Type.Sliced : UnityEngine.UI.Image.Type.Simple;
+    }
+
+    /// <summary>
+    /// BubbleBox Image 에 방향에 맞는 말풍선 스프라이트를 넣습니다.
+    /// </summary>
+    private void ApplySpeechBubbleFrameIfAssigned(GameObject custRoot, ServingManager.ServeDirection direction)
+    {
+        if (custRoot == null) return;
+
+        Sprite spr = ResolveSpeechBubbleFrameForDirection(direction);
+        if (spr == null) return;
+
+        Transform bubbleTf = FindBubbleBoxTransform(custRoot.transform);
+        if (bubbleTf == null) return;
+
+        var img = bubbleTf.GetComponent<UnityEngine.UI.Image>();
+        ApplyImageSpriteAndSlicedType(img, spr);
+        if (img != null)
+            img.raycastTarget = false;
+
+        ApplyBubbleOrientationForSlot(bubbleTf as RectTransform, direction);
+    }
+
+    private static Transform FindBubbleBoxTransform(Transform root)
+    {
+        if (root == null) return null;
+        Transform t = root.Find("BubbleBox");
+        if (t != null) return t;
+        Transform canvas = root.Find("SpeechBubbleCanvas");
+        return canvas != null ? canvas.Find("BubbleBox") : null;
+    }
+
     /// <summary>
     /// 스프라이트 NPC 루트 아래에 World Space 말풍선 Canvas 를 붙입니다.
     /// </summary>
-    private static void AddRuntimeSpeechBubbleHost(GameObject custRoot, ServingManager.ServeDirection direction)
+    private void AddRuntimeSpeechBubbleHost(GameObject custRoot, ServingManager.ServeDirection direction)
     {
         if (custRoot == null) return;
         if (custRoot.transform.Find("SpeechBubbleCanvas") != null) return;
@@ -449,7 +626,7 @@ public class CustomerManager : MonoBehaviour
 
         RectTransform rt = host.AddComponent<RectTransform>();
         rt.localRotation = Quaternion.identity;
-        rt.localPosition = Vector3.zero;
+        rt.localPosition = ResolveSpeechBubbleHostLocalOffset(direction);
         rt.sizeDelta = new Vector2(400f, 400f);
 
         float ps = Mathf.Max(
@@ -461,7 +638,6 @@ public class CustomerManager : MonoBehaviour
 
         Canvas canvas = host.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
-        host.AddComponent<UnityEngine.UI.GraphicRaycaster>();
         host.AddComponent<UnityEngine.UI.CanvasScaler>();
 
         BuildSpeechBubbleUnderCanvasTransform(host.transform, direction);
@@ -470,7 +646,7 @@ public class CustomerManager : MonoBehaviour
     /// <summary>
     /// Canvas 루트 아래에 BubbleBox + BubbleText 를 만듭니다. (CreateCustomerUI / 런타임 말풍선 공용)
     /// </summary>
-    private static UnityEngine.UI.Text BuildSpeechBubbleUnderCanvasTransform(
+    private UnityEngine.UI.Text BuildSpeechBubbleUnderCanvasTransform(
         Transform canvasRoot,
         ServingManager.ServeDirection selectedSlot)
     {
@@ -478,28 +654,126 @@ public class CustomerManager : MonoBehaviour
         bubbleObj.transform.SetParent(canvasRoot, false);
         UnityEngine.UI.Image bubbleImg = bubbleObj.AddComponent<UnityEngine.UI.Image>();
         bubbleImg.color = Color.white;
+        bubbleImg.raycastTarget = false;
+        Sprite frame = ResolveSpeechBubbleFrameForDirection(selectedSlot);
+        if (frame != null)
+            ApplyImageSpriteAndSlicedType(bubbleImg, frame);
         RectTransform bubbleRt = bubbleObj.GetComponent<RectTransform>();
+        bubbleRt.anchoredPosition = ResolveSpeechBubbleAnchoredPosition(selectedSlot);
 
-        if (selectedSlot == ServingManager.ServeDirection.Left || selectedSlot == ServingManager.ServeDirection.Right)
-            bubbleRt.anchoredPosition = new Vector2(0f, 140f);
-        else
+        bubbleRt.sizeDelta = new Vector2(268f, 172f);
+
+        var vlg = bubbleObj.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
+        vlg.childAlignment = TextAnchor.MiddleCenter;
+        vlg.spacing = 6f;
+        vlg.padding = new RectOffset(10, 10, 10, 10);
+        vlg.childControlWidth = false;
+        vlg.childControlHeight = false;
+        vlg.childForceExpandWidth = false;
+        vlg.childForceExpandHeight = false;
+
+        GameObject labelObj = new GameObject("BubbleLabel");
+        labelObj.transform.SetParent(bubbleObj.transform, false);
+        UnityEngine.UI.Text labelTxt = labelObj.AddComponent<UnityEngine.UI.Text>();
+        labelTxt.alignment = TextAnchor.MiddleCenter;
+        labelTxt.fontSize = 22;
+        labelTxt.color = Color.black;
+        labelTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        labelTxt.raycastTarget = false;
+        var labelLe = labelObj.AddComponent<UnityEngine.UI.LayoutElement>();
+        labelLe.preferredWidth = 240f;
+        labelLe.preferredHeight = 28f;
+
+        GameObject rowObj = new GameObject("OrderIconRow");
+        rowObj.transform.SetParent(bubbleObj.transform, false);
+        var hlg = rowObj.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.spacing = 10;
+        hlg.childControlWidth = false;
+        hlg.childControlHeight = false;
+        hlg.childForceExpandWidth = false;
+        hlg.childForceExpandHeight = false;
+        var rowLe = rowObj.AddComponent<UnityEngine.UI.LayoutElement>();
+        rowLe.preferredHeight = 48f;
+        rowLe.preferredWidth = 220f;
+
+        const float iconSize = 40f;
+        for (int i = 0; i < 3; i++)
         {
-            float offsetX = UnityEngine.Random.value > 0.5f ? 200f : -200f;
-            bubbleRt.anchoredPosition = new Vector2(offsetX, 10f);
+            GameObject slot = new GameObject($"Slot{i}");
+            slot.transform.SetParent(rowObj.transform, false);
+            UnityEngine.UI.Image slotImg = slot.AddComponent<UnityEngine.UI.Image>();
+            slotImg.preserveAspect = true;
+            slotImg.color = Color.white;
+            slotImg.raycastTarget = false;
+            var slotLe = slot.AddComponent<UnityEngine.UI.LayoutElement>();
+            slotLe.preferredWidth = iconSize;
+            slotLe.preferredHeight = iconSize;
         }
 
-        bubbleRt.sizeDelta = new Vector2(250f, 150f);
+        ApplyBubbleOrientationForSlot(bubbleRt, selectedSlot);
 
-        GameObject txtObj = new GameObject("BubbleText");
-        txtObj.transform.SetParent(bubbleObj.transform, false);
-        UnityEngine.UI.Text txt = txtObj.AddComponent<UnityEngine.UI.Text>();
-        txt.alignment = TextAnchor.MiddleCenter;
-        txt.fontSize = 28;
-        txt.color = Color.black;
-        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        RectTransform txtRt = txtObj.GetComponent<RectTransform>();
-        txtRt.sizeDelta = bubbleRt.sizeDelta;
-        return txt;
+        return labelTxt;
+    }
+
+    /// <summary>
+    /// 하단 손님 말풍선 꼬리 방향 등을 스프라이트 추가 없이 맞출 때 BubbleBox 의 스케일/회전을 조정합니다.
+    /// </summary>
+    private void ApplyBubbleOrientationForSlot(RectTransform bubbleRt, ServingManager.ServeDirection direction)
+    {
+        if (bubbleRt == null) return;
+
+        if (direction != ServingManager.ServeDirection.Down)
+        {
+            bubbleRt.localScale = Vector3.one;
+            bubbleRt.localEulerAngles = Vector3.zero;
+            return;
+        }
+
+        bool flipX = thisSpawnDownSideIndex == 0 ? speechBubbleFlipXForDownLeft : speechBubbleFlipXForDownRight;
+        bool flipY = thisSpawnDownSideIndex == 0 ? speechBubbleFlipYForDownLeft : speechBubbleFlipYForDownRight;
+        float rotZ = thisSpawnDownSideIndex == 0 ? speechBubbleRotationZForDownLeft : speechBubbleRotationZForDownRight;
+
+        Vector3 s = Vector3.one;
+        if (flipX) s.x = -1f;
+        if (flipY) s.y = -1f;
+        bubbleRt.localScale = s;
+        bubbleRt.localEulerAngles = new Vector3(0f, 0f, rotZ);
+    }
+
+    private Vector3 ResolveSpeechBubbleHostLocalOffset(ServingManager.ServeDirection direction)
+    {
+        switch (direction)
+        {
+            case ServingManager.ServeDirection.Left: return speechBubbleHostLocalOffsetLeft;
+            case ServingManager.ServeDirection.Right: return speechBubbleHostLocalOffsetRight;
+            case ServingManager.ServeDirection.Down:
+            {
+                Vector3 side = thisSpawnDownSideIndex == 0
+                    ? speechBubbleHostLocalOffsetDownLeft
+                    : speechBubbleHostLocalOffsetDownRight;
+                if (side != Vector3.zero) return side;
+                return speechBubbleHostLocalOffsetDown;
+            }
+            default: return Vector3.zero;
+        }
+    }
+
+    private Vector2 ResolveSpeechBubbleAnchoredPosition(ServingManager.ServeDirection selectedSlot)
+    {
+        switch (selectedSlot)
+        {
+            case ServingManager.ServeDirection.Left:
+                return speechBubbleAnchoredPositionLeft;
+            case ServingManager.ServeDirection.Right:
+                return speechBubbleAnchoredPositionRight;
+            case ServingManager.ServeDirection.Down:
+                return thisSpawnDownSideIndex == 0
+                    ? speechBubbleAnchoredPositionDownLeft
+                    : speechBubbleAnchoredPositionDownRight;
+            default:
+                return speechBubbleAnchoredPositionLeft;
+        }
     }
 
     /// <summary>
@@ -526,6 +800,14 @@ public class CustomerManager : MonoBehaviour
                 var cam = Camera.main;
                 if (cam != null) c.worldCamera = cam;
             }
+
+            // 말풍선 등 장식 UI가 EventSystem/Input UI 경로를 가로채지 않도록
+            var graphics = c.GetComponentsInChildren<UnityEngine.UI.Graphic>(true);
+            for (int g = 0; g < graphics.Length; g++)
+            {
+                if (graphics[g] != null)
+                    graphics[g].raycastTarget = false;
+            }
         }
     }
 
@@ -534,7 +816,6 @@ public class CustomerManager : MonoBehaviour
         GameObject custObj = new GameObject($"CustomerUI_{selectedSlot}_{type}");
         Canvas canvas = custObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
-        custObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
         custObj.AddComponent<UnityEngine.UI.CanvasScaler>();
 
         RectTransform rt = custObj.GetComponent<RectTransform>();
@@ -547,6 +828,7 @@ public class CustomerManager : MonoBehaviour
         bodyObj.transform.SetParent(custObj.transform, false);
         UnityEngine.UI.Image img = bodyObj.AddComponent<UnityEngine.UI.Image>();
         img.color = bodyColor;
+        img.raycastTarget = false;
         RectTransform bodyRt = bodyObj.GetComponent<RectTransform>();
         bodyRt.anchoredPosition = new Vector2(0, -50f);
         bodyRt.sizeDelta = new Vector2(200f, 200f);
@@ -558,6 +840,7 @@ public class CustomerManager : MonoBehaviour
         timerBg.transform.SetParent(custObj.transform, false);
         UnityEngine.UI.Image bgImg = timerBg.AddComponent<UnityEngine.UI.Image>();
         bgImg.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+        bgImg.raycastTarget = false;
         RectTransform timerBgRt = timerBg.GetComponent<RectTransform>();
         timerBgRt.anchoredPosition = new Vector2(0, 230f);
         timerBgRt.sizeDelta = new Vector2(180f, 20f);
@@ -566,6 +849,7 @@ public class CustomerManager : MonoBehaviour
         timerFill.transform.SetParent(timerBg.transform, false);
         UnityEngine.UI.Image fillImg = timerFill.AddComponent<UnityEngine.UI.Image>();
         fillImg.color = Color.green;
+        fillImg.raycastTarget = false;
         fillImg.type = UnityEngine.UI.Image.Type.Filled;
         fillImg.fillMethod = UnityEngine.UI.Image.FillMethod.Horizontal;
         RectTransform fillRt = timerFill.GetComponent<RectTransform>();

@@ -172,6 +172,7 @@ public class IceBuildVisualizerUI : MonoBehaviour
         var img = windowRoot.GetComponent<Image>();
         if (img == null)
             img = windowRoot.gameObject.AddComponent<Image>();
+        img.enabled = true;
         img.color = new Color(1f, 1f, 1f, 0f); // 완전 투명(보이지 않음)
         img.raycastTarget = true;
 
