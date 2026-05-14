@@ -408,13 +408,14 @@ public class CustomerManager : MonoBehaviour
             orderToppingIconMilk,
             orderToppingIconFruit);
 
-        // World Space 손님 UI는 메인 Screen Space - Camera Canvas(-100 등)와 별도 정렬이라
-        // 배경/패널 뒤로 밀릴 수 있음 → Sort Order를 올립니다.
-        EnsureCustomerWorldCanvasRendersOnTop(custObj.transform);
-
-        // 주문 생성
+        // 주문 생성 (아이콘 스프라이트·SetActive 이후에 레이캐스트 정리해야 함)
         int reqToppingCount = scoreManager != null ? scoreManager.GetRequiredToppingCount() : 1;
         customer.InitializeOrder(reqToppingCount);
+
+        // World Space 손님 UI는 메인 Screen Space - Camera Canvas(-100 등)와 별도 정렬이라
+        // 배경/패널 뒤로 밀릴 수 있음 → Sort Order를 올립니다.
+        // 주문 UI 스프라이트 적용 후에도 Screen Space 말풍선 등이 레이캐스트를 켜면 입력이 죽은 것처럼 보이므로 InitializeOrder 이후에 한 번 더 처리합니다.
+        EnsureCustomerWorldCanvasRendersOnTop(custObj.transform);
 
         activeCustomers[direction] = customer;
         Debug.Log($"[CustomerManager] {direction} 방향에 {type} 손님 등장! (요구 토핑: {reqToppingCount}개)");
@@ -777,7 +778,8 @@ public class CustomerManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 손님 루트 아래 World Space Canvas가 메인 UI Canvas보다 뒤에 그려지지 않도록 정렬을 고정합니다.
+    /// World Space 말풍선 캔버스 정렬 + 손님 오브젝트 전체 UI에서 레이캐스트 차단.
+    /// (Screen Space - Camera 말풍선만 있어도 주문 아이콘 Image 가 터치를 먹으면 게임 입력이 막힙니다.)
     /// </summary>
     private static void EnsureCustomerWorldCanvasRendersOnTop(Transform customerRoot)
     {
@@ -800,14 +802,13 @@ public class CustomerManager : MonoBehaviour
                 var cam = Camera.main;
                 if (cam != null) c.worldCamera = cam;
             }
+        }
 
-            // 말풍선 등 장식 UI가 EventSystem/Input UI 경로를 가로채지 않도록
-            var graphics = c.GetComponentsInChildren<UnityEngine.UI.Graphic>(true);
-            for (int g = 0; g < graphics.Length; g++)
-            {
-                if (graphics[g] != null)
-                    graphics[g].raycastTarget = false;
-            }
+        var graphics = customerRoot.GetComponentsInChildren<UnityEngine.UI.Graphic>(true);
+        for (int g = 0; g < graphics.Length; g++)
+        {
+            if (graphics[g] != null)
+                graphics[g].raycastTarget = false;
         }
     }
 

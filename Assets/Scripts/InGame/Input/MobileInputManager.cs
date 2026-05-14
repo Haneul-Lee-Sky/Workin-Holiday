@@ -43,7 +43,16 @@ public class MobileInputManager : MonoBehaviour
     const float MinCenterSwipeSafetyTimeout = 0.35f;
 
     [Header("Debug")]
+    [Tooltip("Pointer Down/Up 등 입력 이벤트가 있을 때만 로그가 납니다. 터치가 안 들어오면 콘솔이 조용합니다.")]
     [SerializeField] private bool enableInputLog = true;
+
+    [Header("Diagnostic — ‘조용한’ 입력 멈춤")]
+    [Tooltip("게임이 도는 동안 N초마다 한 줄 상태를 찍습니다. 포인터 0·게임 비활성·centerDown 등 원인 추적용. 해결 후 끄세요.")]
+    [SerializeField] private bool diagnosticHeartbeat = false;
+    [SerializeField] private float diagnosticIntervalSeconds = 2.5f;
+
+    private float nextDiagnosticUnscaledTime;
+    private float lastNoPointerLogUnscaledTime = -999f;
 
     // 구역 경계 캐시
     private float cachedBoundaryLow;
@@ -167,9 +176,39 @@ public class MobileInputManager : MonoBehaviour
         if (!didConfigureUiInputModule)
             TryConfigureUiInputModuleForGameplay();
 
-        if (gameManager != null && !gameManager.IsGameActive) return;
+        float unscaled = Time.unscaledTime;
+        if (diagnosticHeartbeat && unscaled >= nextDiagnosticUnscaledTime)
+        {
+            nextDiagnosticUnscaledTime = unscaled + Mathf.Max(0.5f, diagnosticIntervalSeconds);
+            LogDiagnosticHeartbeat();
+        }
+
+        if (gameManager != null && !gameManager.IsGameActive)
+            return;
 
         HandlePointerInput();
+    }
+
+    /// <summary>
+    /// 입력 이벤트가 없어도 주기적으로 찍어, ‘멈췄는데 콘솔이 비는’ 상황을 줄입니다.
+    /// </summary>
+    private void LogDiagnosticHeartbeat()
+    {
+        CollectActivePointerDevices();
+        int n = activePointers.Count;
+        bool gameActive = gameManager == null || gameManager.IsGameActive;
+        string deviceBits = "";
+        for (int i = 0; i < n && i < 5; i++)
+        {
+            Pointer p = activePointers[i];
+            if (p == null) continue;
+            bool pressed = p.press.isPressed;
+            deviceBits += $" [{p.name}:{(pressed ? "↓" : "·")}]";
+        }
+
+        Debug.Log(
+            $"[MobileInputDiag] gameActive={gameActive} scriptOn={enabled} goActive={gameObject.activeInHierarchy} " +
+            $"pointers={n} centerDown={isCenterDown} timeScale={Time.timeScale}{deviceBits}");
     }
 
     /// <summary>
@@ -234,7 +273,15 @@ public class MobileInputManager : MonoBehaviour
     {
         // Mouse.current / Touchscreen.current 만 쓰면 시뮬레이터·일부 기기의 보조 Pointer(예: FastTouchscreen)가 빠질 수 있음
         CollectActivePointerDevices();
-        if (activePointers.Count == 0) return;
+        if (activePointers.Count == 0)
+        {
+            if (diagnosticHeartbeat && Time.unscaledTime - lastNoPointerLogUnscaledTime >= Mathf.Max(1f, diagnosticIntervalSeconds))
+            {
+                lastNoPointerLogUnscaledTime = Time.unscaledTime;
+                Debug.LogWarning("[MobileInputDiag] 활성 Pointer 디바이스가 0개입니다. (시뮬/기기 입력이 InputSystem에 안 들어오는 상태)");
+            }
+            return;
+        }
 
         // Center swipe release 처리 (누르고 있는 동안에는 return 하지 않음 → 아래 새 Press 루프는 항상 실행)
         if (isCenterDown)

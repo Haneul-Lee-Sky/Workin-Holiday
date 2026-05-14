@@ -111,6 +111,11 @@ public class IceBuildVisualizerUI : MonoBehaviour
         iceMachine.OnIceReset -= HandleIceReset;
     }
 
+    private void OnDestroy()
+    {
+        ClearSplitSpriteCache();
+    }
+
     private void EnsureWindow()
     {
         // 이미 씬에 만들어둔 창이 있으면 재사용 (Play 중 중복 생성 방지)
@@ -432,6 +437,8 @@ public class IceBuildVisualizerUI : MonoBehaviour
         if (cupSpriteRuntime != null && iceOnlySpritesRuntime != null && iceOnlySpritesRuntime.Length == iceStepSprites.Length)
             return;
 
+        ClearSplitSpriteCache();
+
         // Build cup sprite from step0, and ice-only sprites from each step by cropping
         var src0 = iceStepSprites[0];
         if (src0 == null) return;
@@ -462,6 +469,43 @@ public class IceBuildVisualizerUI : MonoBehaviour
             }
             Rect iceRect = new Rect(r.x, r.y + h, r.width, iceH);
             iceOnlySpritesRuntime[i] = Sprite.Create(s.texture, iceRect, new Vector2(0.5f, 0f), s.pixelsPerUnit, 0, SpriteMeshType.FullRect);
+        }
+    }
+
+    /// <summary>Sprite.Create 로 만든 런타임 스프라이트 — 재빌드 전에 Destroy 하지 않으면 메모리에 계속 쌓입니다.</summary>
+    private void ClearSplitSpriteCache()
+    {
+        if (cupImage != null && cupImage.sprite == cupSpriteRuntime)
+            cupImage.sprite = null;
+
+        if (iceStackImage != null && iceStackImage.sprite != null && iceOnlySpritesRuntime != null)
+        {
+            Sprite cur = iceStackImage.sprite;
+            for (int i = 0; i < iceOnlySpritesRuntime.Length; i++)
+            {
+                if (iceOnlySpritesRuntime[i] == cur)
+                {
+                    iceStackImage.sprite = null;
+                    break;
+                }
+            }
+        }
+
+        if (cupSpriteRuntime != null)
+        {
+            Destroy(cupSpriteRuntime);
+            cupSpriteRuntime = null;
+        }
+
+        if (iceOnlySpritesRuntime != null)
+        {
+            for (int i = 0; i < iceOnlySpritesRuntime.Length; i++)
+            {
+                if (iceOnlySpritesRuntime[i] != null)
+                    Destroy(iceOnlySpritesRuntime[i]);
+            }
+
+            iceOnlySpritesRuntime = null;
         }
     }
 

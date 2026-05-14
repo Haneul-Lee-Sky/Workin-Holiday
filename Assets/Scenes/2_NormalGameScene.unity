@@ -1375,7 +1375,10 @@ MonoBehaviour:
   bottomZoneRatio: 0.33333334
   centerZoneRatio: 0.33333334
   minSwipeDistance: 50
+  centerSwipeSafetyTimeoutSeconds: 2.5
   enableInputLog: 1
+  diagnosticHeartbeat: 1
+  diagnosticIntervalSeconds: 2.5
 --- !u!4 &1213537352
 Transform:
   m_ObjectHideFlags: 0
@@ -1410,6 +1413,29 @@ MonoBehaviour:
   rightSlot: {fileID: 397954054}
   bottomSlot: {fileID: 287744249}
   customerPrefab: {fileID: 0}
+  speechBubbleFrameSpriteLeft: {fileID: -1275980934934123951, guid: 68fb68cb420f229468ac46ab3fef3ad0, type: 3}
+  speechBubbleFrameSpriteRight: {fileID: -3047741824678258033, guid: 68fb68cb420f229468ac46ab3fef3ad0, type: 3}
+  speechBubbleFrameSpriteDown: {fileID: 2449433303155478532, guid: 68fb68cb420f229468ac46ab3fef3ad0, type: 3}
+  speechBubbleFrameSpriteDownVariant: {fileID: -1651755562109550868, guid: 68fb68cb420f229468ac46ab3fef3ad0, type: 3}
+  speechBubbleFrameSprite: {fileID: 0}
+  orderToppingIconRedBean: {fileID: 5693600146865101926, guid: ff659a1d17675344d8a0dc108549ef1c, type: 3}
+  orderToppingIconMilk: {fileID: -8595150884068151174, guid: ff659a1d17675344d8a0dc108549ef1c, type: 3}
+  orderToppingIconFruit: {fileID: 1565466356606959809, guid: ff659a1d17675344d8a0dc108549ef1c, type: 3}
+  speechBubbleAnchoredPositionLeft: {x: 0, y: 140}
+  speechBubbleAnchoredPositionRight: {x: 0, y: 140}
+  speechBubbleAnchoredPositionDownLeft: {x: -200, y: 10}
+  speechBubbleAnchoredPositionDownRight: {x: 200, y: 10}
+  speechBubbleHostLocalOffsetLeft: {x: 0, y: 0, z: 0}
+  speechBubbleHostLocalOffsetRight: {x: 0, y: 0, z: 0}
+  speechBubbleHostLocalOffsetDownLeft: {x: 0, y: 0, z: 0}
+  speechBubbleHostLocalOffsetDownRight: {x: 0, y: 0, z: 0}
+  speechBubbleHostLocalOffsetDown: {x: 0, y: 0, z: 0}
+  speechBubbleFlipXForDownLeft: 0
+  speechBubbleFlipXForDownRight: 0
+  speechBubbleFlipYForDownLeft: 0
+  speechBubbleFlipYForDownRight: 0
+  speechBubbleRotationZForDownLeft: 0
+  speechBubbleRotationZForDownRight: 0
   customerMountParent: {fileID: 0}
   approachDistanceFromTable: 1.2
   stopOffsetFromTableEdge: 0.28

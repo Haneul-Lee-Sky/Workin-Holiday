@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 런타임에서 URP Rendering Debugger([Debug Canvas] / Display Stats)가
-/// Ctrl+Backspace 등으로 켜지지 않도록 매 프레임 차단합니다.
+/// Ctrl+Backspace 등으로 켜지지 않도록 주기적으로 끕니다.
 /// </summary>
 public class URPDebugDisabler : MonoBehaviour
 {
@@ -14,6 +14,11 @@ public class URPDebugDisabler : MonoBehaviour
     private object debugManagerInstance;
     private PropertyInfo enableRuntimeUIProp;
     private bool initialized = false;
+    /// <summary>런타임에 URP DebugManager 를 못 찾았을 때 — 매 Apply 마다 GetAssemblies() 전체 스캔을 반복하지 않도록.</summary>
+    private bool initGiveUp;
+
+    private float nextDebugCanvasPollUnscaledTime = -999f;
+    private const float DebugCanvasPollIntervalSeconds = 1f;
 
     private void Awake()
     {
@@ -51,7 +56,12 @@ public class URPDebugDisabler : MonoBehaviour
 
     private void Update()
     {
-        // [Debug Canvas]가 활성화된 순간 즉시 끔
+        // GameObject.Find 는 씬 전체를 매 프레임 도는 것과 같아서, 손님/UI가 늘어날수록 프레임이 초 단위로 밀립니다.
+        // (Profiler 에서 Behaviour.Update 가 수백 ms 로 보이는 전형적인 원인)
+        if (Time.unscaledTime < nextDebugCanvasPollUnscaledTime)
+            return;
+        nextDebugCanvasPollUnscaledTime = Time.unscaledTime + DebugCanvasPollIntervalSeconds;
+
         var debugCanvas = GameObject.Find("[Debug Canvas]");
         if (debugCanvas != null && debugCanvas.activeSelf)
         {
@@ -62,7 +72,10 @@ public class URPDebugDisabler : MonoBehaviour
 
     private void TryInit()
     {
-        if (initialized) return;
+        if (initialized || initGiveUp) return;
+
+        // GetAssemblies() 는 비용이 크므로 후보마다 다시 부르지 않습니다.
+        var allAssemblies = System.AppDomain.CurrentDomain.GetAssemblies();
 
         string[] candidateAssemblies = {
             "Unity.RenderPipelines.Core.Runtime",
@@ -72,8 +85,7 @@ public class URPDebugDisabler : MonoBehaviour
 
         foreach (var asmName in candidateAssemblies)
         {
-            var asm = System.AppDomain.CurrentDomain.GetAssemblies()
-                .FirstOrDefault(a => a.GetName().Name == asmName);
+            var asm = allAssemblies.FirstOrDefault(a => a.GetName().Name == asmName);
             if (asm == null) continue;
 
             debugManagerType = asm.GetType("UnityEngine.Rendering.DebugManager");
@@ -101,11 +113,15 @@ public class URPDebugDisabler : MonoBehaviour
             initialized = true;
             break;
         }
+
+        if (!initialized)
+            initGiveUp = true;
     }
 
     private void Apply()
     {
-        if (!initialized) TryInit();
+        if (!initialized && !initGiveUp)
+            TryInit();
         if (initialized && debugManagerInstance != null && enableRuntimeUIProp != null)
             enableRuntimeUIProp.SetValue(debugManagerInstance, false);
     }

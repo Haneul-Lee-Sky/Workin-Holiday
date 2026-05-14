@@ -20,6 +20,8 @@ public class DebugZoneOverlay : MonoBehaviour
     private GUIStyle smallLabel;
     private bool stylesReady = false;
 
+    private MobileInputManager cachedInputMgr;
+
     private void OnEnable()
     {
 #if !UNITY_EDITOR && !DEVELOPMENT_BUILD
@@ -27,6 +29,7 @@ public class DebugZoneOverlay : MonoBehaviour
         enabled = false;
         return;
 #endif
+        cachedInputMgr = FindAnyObjectByType<MobileInputManager>();
         blueTex = MakeTex(new Color(0.2f, 0.5f, 1f));
         greenTex = MakeTex(new Color(0.2f, 0.8f, 0.3f));
         redTex = MakeTex(new Color(1f, 0.3f, 0.3f));
@@ -88,11 +91,12 @@ public class DebugZoneOverlay : MonoBehaviour
         // MobileInputManager에서 비율 가져오기 (없으면 기본 1/3)
         float bottomRatio = 0.33f;
         float centerRatio = 0.33f;
-        MobileInputManager inputMgr = FindAnyObjectByType<MobileInputManager>();
-        if (inputMgr != null)
+        if (cachedInputMgr == null)
+            cachedInputMgr = FindAnyObjectByType<MobileInputManager>();
+        if (cachedInputMgr != null)
         {
-            bottomRatio = inputMgr.BottomZoneRatio;
-            centerRatio = inputMgr.CenterZoneRatio;
+            bottomRatio = cachedInputMgr.BottomZoneRatio;
+            centerRatio = cachedInputMgr.CenterZoneRatio;
         }
         float topRatio = 1f - bottomRatio - centerRatio;
 

@@ -17,8 +17,21 @@ public class Customer : MonoBehaviour
 
     [Header("UI")]
     [SerializeField] private Text speechBubbleText;
+    [Tooltip("비우면 씬의 IceMachine 이 하단 토핑 버튼에서 쓰는 스프라이트를 가져옵니다.")]
+    [SerializeField] private Sprite orderIconRedBean;
+    [SerializeField] private Sprite orderIconMilk;
+    [SerializeField] private Sprite orderIconFruit;
+
+    /// <summary>CustomerManager 등에서 넣는 런타임 우선 스프라이트(null 이면 무시).</summary>
+    private Sprite runtimeOrderIconRedBean;
+    private Sprite runtimeOrderIconMilk;
+    private Sprite runtimeOrderIconFruit;
+
+    private Image[] orderIconSlots;
     private GameObject timerGaugeObj;
     private Image timerGaugeFill;
+
+    private IceMachine cachedIceMachineForOrderUi;
 
     [Header("Type")]
     public CustomerType customerType = CustomerType.Normal;
@@ -171,18 +184,123 @@ public class Customer : MonoBehaviour
 
     public void RefreshBubbleView()
     {
+        bool anyTopping = orderData.hasRedBean || orderData.hasMilk || orderData.hasFruit;
+
         if (speechBubbleText != null)
         {
-            string orderStr = "주문:\n";
-            if (orderData.hasRedBean) orderStr += "[팥] ";
-            if (orderData.hasMilk) orderStr += "[연유] ";
-            if (orderData.hasFruit) orderStr += "[과일] ";
-
-            if (!orderData.hasRedBean && !orderData.hasMilk && !orderData.hasFruit)
-                orderStr += "(토핑 없음)";
-
-            speechBubbleText.text = orderStr.TrimEnd();
+            if (anyTopping)
+            {
+                speechBubbleText.text = string.Empty;
+                speechBubbleText.gameObject.SetActive(false);
+            }
+            else
+            {
+                speechBubbleText.gameObject.SetActive(true);
+                speechBubbleText.text = "(토핑 없음)";
+            }
         }
+
+        EnsureOrderIconSlotsCached();
+        if (orderIconSlots == null || orderIconSlots.Length != 3)
+            return;
+
+        if (cachedIceMachineForOrderUi == null)
+            cachedIceMachineForOrderUi = UnityEngine.Object.FindAnyObjectByType<IceMachine>();
+
+        bool[] has = { orderData.hasRedBean, orderData.hasMilk, orderData.hasFruit };
+        IceMachine.ToppingType[] types =
+        {
+            IceMachine.ToppingType.RedBean,
+            IceMachine.ToppingType.Milk,
+            IceMachine.ToppingType.Fruit
+        };
+
+        int shown = 0;
+        for (int t = 0; t < 3; t++)
+        {
+            if (!has[t])
+                continue;
+
+            if (shown >= orderIconSlots.Length)
+                break;
+
+            Image img = orderIconSlots[shown];
+            if (img != null)
+            {
+                Sprite s = GetOrderSpriteForTopping(types[t], cachedIceMachineForOrderUi);
+                img.sprite = s;
+                img.color = s != null ? Color.white : new Color(0.75f, 0.75f, 0.75f, 1f);
+                img.raycastTarget = false;
+                img.gameObject.SetActive(true);
+            }
+
+            shown++;
+        }
+
+        for (int s = shown; s < orderIconSlots.Length; s++)
+        {
+            if (orderIconSlots[s] != null)
+                orderIconSlots[s].gameObject.SetActive(false);
+        }
+    }
+
+    /// <summary>
+    /// 씬의 CustomerManager 인스펙터에 넣은 토핑 아이콘을 쓰려면 스폰 직후 이 메서드를 호출합니다(null 은 해당 토핑만 기본 규칙).
+    /// </summary>
+    public void ApplyOrderIconSourcesFromManager(Sprite redBean, Sprite milk, Sprite fruit)
+    {
+        runtimeOrderIconRedBean = redBean;
+        runtimeOrderIconMilk = milk;
+        runtimeOrderIconFruit = fruit;
+        RefreshBubbleView();
+    }
+
+    private Sprite GetOrderSpriteForTopping(IceMachine.ToppingType type, IceMachine iceMachine)
+    {
+        switch (type)
+        {
+            case IceMachine.ToppingType.RedBean:
+                if (runtimeOrderIconRedBean != null) return runtimeOrderIconRedBean;
+                if (orderIconRedBean != null) return orderIconRedBean;
+                break;
+            case IceMachine.ToppingType.Milk:
+                if (runtimeOrderIconMilk != null) return runtimeOrderIconMilk;
+                if (orderIconMilk != null) return orderIconMilk;
+                break;
+            case IceMachine.ToppingType.Fruit:
+                if (runtimeOrderIconFruit != null) return runtimeOrderIconFruit;
+                if (orderIconFruit != null) return orderIconFruit;
+                break;
+        }
+
+        return iceMachine != null ? iceMachine.GetToppingSpriteForUI(type) : null;
+    }
+
+    private void EnsureOrderIconSlotsCached()
+    {
+        if (orderIconSlots != null && orderIconSlots.Length == 3 && orderIconSlots[0] != null)
+            return;
+
+        orderIconSlots = null;
+        if (speechBubbleText == null)
+            return;
+
+        Transform bubble = speechBubbleText.transform.parent;
+        if (bubble == null)
+            return;
+
+        Transform row = bubble.Find("OrderIconRow");
+        if (row == null)
+            return;
+
+        var slots = new Image[3];
+        for (int i = 0; i < 3; i++)
+        {
+            Transform slot = row.Find($"Slot{i}");
+            slots[i] = slot != null ? slot.GetComponent<Image>() : null;
+        }
+
+        orderIconSlots = slots;
     }
 
     /// <summary>
@@ -191,7 +309,8 @@ public class Customer : MonoBehaviour
     public void SetupUI(Text textComponent)
     {
         speechBubbleText = textComponent;
-        RefreshBubbleView();
+        orderIconSlots = null;
+        cachedIceMachineForOrderUi = null;
     }
 
     /// <summary>
