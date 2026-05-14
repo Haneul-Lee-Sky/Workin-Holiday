@@ -306,31 +306,12 @@ public class CustomerManager : MonoBehaviour
         // 만료 이벤트 구독
         customer.OnExpired += HandleCustomerExpired;
 
-        // UI 텍스트 연결 (프리팹/임시 모두 시도)
-        {
-            UnityEngine.UI.Text txt = custObj.GetComponentInChildren<UnityEngine.UI.Text>(true);
-            if (txt != null)
-            {
-                customer.SetupUI(txt);
-            }
-            else
-            {
-                // TMP가 있을 수도 있어 런타임 타입으로 시도 (패키지 의존성 없이)
-                var tmpType = Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro");
-                if (tmpType != null)
-                {
-                    var tmp = custObj.GetComponentInChildren(tmpType, true);
-                    if (tmp != null)
-                    {
-                        // Customer는 UnityEngine.UI.Text 기반이므로, TMP가 있으면 직접 텍스트만 갱신하는 폴백
-                        // (주문 갱신은 Customer.RefreshBubbleView에서 수행)
-                        // 여기서는 Customer 내부 참조가 없으니, 최소한 비어있지 않게 초기화만 합니다.
-                        var prop = tmpType.GetProperty("text");
-                        if (prop != null) prop.SetValue(tmp, "주문:\n(생성중)");
-                    }
-                }
-            }
-        }
+        // 스프라이트 전용 NPC 프리팹 등 Text가 없으면 주문이 절대 안 보임 → 말풍선 UI를 붙입니다.
+        TryBindSpeechBubbleText(custObj, direction, customer);
+
+        // World Space 손님 UI는 메인 Screen Space - Camera Canvas(-100 등)와 별도 정렬이라
+        // 배경/패널 뒤로 밀릴 수 있음 → Sort Order를 올립니다.
+        EnsureCustomerWorldCanvasRendersOnTop(custObj.transform);
 
         // 주문 생성
         int reqToppingCount = scoreManager != null ? scoreManager.GetRequiredToppingCount() : 1;
@@ -431,11 +412,129 @@ public class CustomerManager : MonoBehaviour
         Destroy(customer.gameObject);
     }
 
+    /// <summary>
+    /// Customer.RefreshBubbleView 가 쓰는 Legacy Text 를 찾거나, 없으면 NPC 스프라이트 프리팹용 말풍선을 붙입니다.
+    /// (SpawnManager 의 NPC_M_1_62 등에는 Text 가 없어 주문이 비어 있었음.)
+    /// </summary>
+    private void TryBindSpeechBubbleText(GameObject custObj, ServingManager.ServeDirection direction, Customer customer)
+    {
+        UnityEngine.UI.Text txt = custObj.GetComponentInChildren<UnityEngine.UI.Text>(true);
+        if (txt == null)
+        {
+            var tmpType = Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro");
+            if (tmpType != null && custObj.GetComponentInChildren(tmpType, true) != null)
+            {
+                Debug.LogWarning(
+                    "[CustomerManager] 손님에 Legacy Text 가 없고 TMP 만 있습니다. 주문 표시용 BubbleText 를 추가합니다.");
+            }
+
+            AddRuntimeSpeechBubbleHost(custObj, direction);
+            txt = custObj.GetComponentInChildren<UnityEngine.UI.Text>(true);
+        }
+
+        if (txt != null)
+            customer.SetupUI(txt);
+    }
+
+    /// <summary>
+    /// 스프라이트 NPC 루트 아래에 World Space 말풍선 Canvas 를 붙입니다.
+    /// </summary>
+    private static void AddRuntimeSpeechBubbleHost(GameObject custRoot, ServingManager.ServeDirection direction)
+    {
+        if (custRoot == null) return;
+        if (custRoot.transform.Find("SpeechBubbleCanvas") != null) return;
+
+        GameObject host = new GameObject("SpeechBubbleCanvas");
+        host.transform.SetParent(custRoot.transform, false);
+
+        RectTransform rt = host.AddComponent<RectTransform>();
+        rt.localRotation = Quaternion.identity;
+        rt.localPosition = Vector3.zero;
+        rt.sizeDelta = new Vector2(400f, 400f);
+
+        float ps = Mathf.Max(
+            Mathf.Max(Mathf.Abs(custRoot.transform.lossyScale.x), Mathf.Abs(custRoot.transform.lossyScale.y)),
+            1e-4f);
+        const float referenceWorldScale = 0.003f;
+        float sc = referenceWorldScale / ps;
+        host.transform.localScale = new Vector3(sc, sc, sc);
+
+        Canvas canvas = host.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        host.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+        host.AddComponent<UnityEngine.UI.CanvasScaler>();
+
+        BuildSpeechBubbleUnderCanvasTransform(host.transform, direction);
+    }
+
+    /// <summary>
+    /// Canvas 루트 아래에 BubbleBox + BubbleText 를 만듭니다. (CreateCustomerUI / 런타임 말풍선 공용)
+    /// </summary>
+    private static UnityEngine.UI.Text BuildSpeechBubbleUnderCanvasTransform(
+        Transform canvasRoot,
+        ServingManager.ServeDirection selectedSlot)
+    {
+        GameObject bubbleObj = new GameObject("BubbleBox");
+        bubbleObj.transform.SetParent(canvasRoot, false);
+        UnityEngine.UI.Image bubbleImg = bubbleObj.AddComponent<UnityEngine.UI.Image>();
+        bubbleImg.color = Color.white;
+        RectTransform bubbleRt = bubbleObj.GetComponent<RectTransform>();
+
+        if (selectedSlot == ServingManager.ServeDirection.Left || selectedSlot == ServingManager.ServeDirection.Right)
+            bubbleRt.anchoredPosition = new Vector2(0f, 140f);
+        else
+        {
+            float offsetX = UnityEngine.Random.value > 0.5f ? 200f : -200f;
+            bubbleRt.anchoredPosition = new Vector2(offsetX, 10f);
+        }
+
+        bubbleRt.sizeDelta = new Vector2(250f, 150f);
+
+        GameObject txtObj = new GameObject("BubbleText");
+        txtObj.transform.SetParent(bubbleObj.transform, false);
+        UnityEngine.UI.Text txt = txtObj.AddComponent<UnityEngine.UI.Text>();
+        txt.alignment = TextAnchor.MiddleCenter;
+        txt.fontSize = 28;
+        txt.color = Color.black;
+        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        RectTransform txtRt = txtObj.GetComponent<RectTransform>();
+        txtRt.sizeDelta = bubbleRt.sizeDelta;
+        return txt;
+    }
+
+    /// <summary>
+    /// 손님 루트 아래 World Space Canvas가 메인 UI Canvas보다 뒤에 그려지지 않도록 정렬을 고정합니다.
+    /// </summary>
+    private static void EnsureCustomerWorldCanvasRendersOnTop(Transform customerRoot)
+    {
+        if (customerRoot == null) return;
+
+        const int kCustomerWorldCanvasSortOrder = 200;
+
+        var canvases = customerRoot.GetComponentsInChildren<Canvas>(true);
+        for (int i = 0; i < canvases.Length; i++)
+        {
+            Canvas c = canvases[i];
+            if (c == null || c.renderMode != RenderMode.WorldSpace) continue;
+
+            c.overrideSorting = true;
+            if (c.sortingOrder < kCustomerWorldCanvasSortOrder)
+                c.sortingOrder = kCustomerWorldCanvasSortOrder;
+
+            if (c.worldCamera == null)
+            {
+                var cam = Camera.main;
+                if (cam != null) c.worldCamera = cam;
+            }
+        }
+    }
+
     private GameObject CreateCustomerUI(ServingManager.ServeDirection selectedSlot, CustomerType type)
     {
         GameObject custObj = new GameObject($"CustomerUI_{selectedSlot}_{type}");
         Canvas canvas = custObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
+        custObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
         custObj.AddComponent<UnityEngine.UI.CanvasScaler>();
 
         RectTransform rt = custObj.GetComponent<RectTransform>();
@@ -452,34 +551,7 @@ public class CustomerManager : MonoBehaviour
         bodyRt.anchoredPosition = new Vector2(0, -50f);
         bodyRt.sizeDelta = new Vector2(200f, 200f);
 
-        // 말풍선
-        GameObject bubbleObj = new GameObject("BubbleBox");
-        bubbleObj.transform.SetParent(custObj.transform, false);
-        UnityEngine.UI.Image bubbleImg = bubbleObj.AddComponent<UnityEngine.UI.Image>();
-        bubbleImg.color = Color.white;
-        RectTransform bubbleRt = bubbleObj.GetComponent<RectTransform>();
-
-        if (selectedSlot == ServingManager.ServeDirection.Left || selectedSlot == ServingManager.ServeDirection.Right)
-        {
-            bubbleRt.anchoredPosition = new Vector2(0f, 140f);
-        }
-        else
-        {
-            float offsetX = UnityEngine.Random.value > 0.5f ? 200f : -200f;
-            bubbleRt.anchoredPosition = new Vector2(offsetX, 10f);
-        }
-        bubbleRt.sizeDelta = new Vector2(250f, 150f);
-
-        // 말풍선 텍스트
-        GameObject txtObj = new GameObject("BubbleText");
-        txtObj.transform.SetParent(bubbleObj.transform, false);
-        UnityEngine.UI.Text txt = txtObj.AddComponent<UnityEngine.UI.Text>();
-        txt.alignment = TextAnchor.MiddleCenter;
-        txt.fontSize = 28;
-        txt.color = Color.black;
-        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        RectTransform txtRt = txtObj.GetComponent<RectTransform>();
-        txtRt.sizeDelta = bubbleRt.sizeDelta;
+        BuildSpeechBubbleUnderCanvasTransform(custObj.transform, selectedSlot);
 
         // 타이머 게이지 (머리 위, 기본 숨김)
         GameObject timerBg = new GameObject("TimerGaugeBg");
