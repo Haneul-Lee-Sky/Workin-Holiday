@@ -77,6 +77,53 @@ public class CustomerManager : MonoBehaviour
     [Range(-180f, 180f)]
     [SerializeField] private float speechBubbleRotationZForDownRight;
 
+    [Header("말풍선 UI (크기·간격·내부 위치)")]
+    [Tooltip("말풍선 박스(BubbleBox) 전체 크기 — RectTransform.sizeDelta")]
+    [SerializeField] private Vector2 speechBubbleBoxSizeDelta = new Vector2(268f, 172f);
+    [Tooltip("말풍선 안 세로 간격(라벨 ↔ 아이콘 행). VerticalLayoutGroup.spacing")]
+    [SerializeField] private float speechBubbleVerticalSpacing = 6f;
+    [SerializeField] private int speechBubblePaddingLeft = 10;
+    [SerializeField] private int speechBubblePaddingRight = 10;
+    [SerializeField] private int speechBubblePaddingTop = 10;
+    [SerializeField] private int speechBubblePaddingBottom = 10;
+    [Tooltip("주문 아이콘 한 칸의 가로·세로(픽셀)")]
+    [SerializeField] private float orderIconSlotSize = 40f;
+    [Tooltip("아이콘 사이 가로 간격 — HorizontalLayoutGroup.spacing")]
+    [SerializeField] private float orderIconRowHorizontalSpacing = 10f;
+    [Tooltip("아이콘 행(OrderIconRow) 권장 크기 — LayoutElement preferredWidth/Height")]
+    [SerializeField] private Vector2 orderIconRowPreferredSize = new Vector2(220f, 48f);
+    [Tooltip("상단 라벨 영역(BubbleLabel) 권장 크기. 높이를 0에 가깝게 줄이면 아이콘만 크게 보이기 쉽습니다.")]
+    [SerializeField] private Vector2 bubbleLabelPreferredSize = new Vector2(240f, 28f);
+    [SerializeField] private float bubbleLabelFontSize = 22f;
+    [Tooltip("아이콘 행만 통째로 스케일 (1 = 기본)")]
+    [SerializeField] private float orderIconRowScale = 1f;
+    [Tooltip("아이콘 행을 말풍선 안에서 위·아래로 미세 이동 (앵커드 Y)")]
+    [SerializeField] private float orderIconRowAnchoredOffsetY;
+    [Tooltip("상단 라벨을 위·아래로 미세 이동 (앵커드 Y)")]
+    [SerializeField] private float bubbleLabelAnchoredOffsetY;
+
+    [Header("말풍선 UI — 하단 손님 좌·우 배치 전용")]
+    [Tooltip("하단 왼쪽 배치(번갈 0번)일 때 아이콘 칸 한 변. 0이면 위 공통 Order Icon Slot Size")]
+    [SerializeField] private float orderIconSlotSizeDownLeft;
+    [Tooltip("하단 오른쪽 배치(번갈 1번)일 때 아이콘 칸 한 변. 0이면 공통")]
+    [SerializeField] private float orderIconSlotSizeDownRight;
+    [Tooltip("하단 왼쪽일 때 아이콘 행 Y = 공통 오프셋 + 이 값")]
+    [SerializeField] private float orderIconRowExtraOffsetYDownLeft;
+    [Tooltip("하단 오른쪽일 때 아이콘 행 Y = 공통 오프셋 + 이 값")]
+    [SerializeField] private float orderIconRowExtraOffsetYDownRight;
+    [Tooltip("하단 왼쪽일 때 아이콘 행 스케일. 0이면 공통 Order Icon Row Scale")]
+    [SerializeField] private float orderIconRowScaleDownLeft;
+    [Tooltip("하단 오른쪽일 때 아이콘 행 스케일. 0이면 공통")]
+    [SerializeField] private float orderIconRowScaleDownRight;
+    [Tooltip("하단 왼쪽일 때 아이콘 행 권장 크기. (0,0)이면 공통 Order Icon Row Preferred Size")]
+    [SerializeField] private Vector2 orderIconRowPreferredSizeDownLeft;
+    [Tooltip("하단 오른쪽일 때 아이콘 행 권장 크기. (0,0)이면 공통")]
+    [SerializeField] private Vector2 orderIconRowPreferredSizeDownRight;
+    [Tooltip("하단 왼쪽일 때 아이콘 가로 간격. 0이면 공통")]
+    [SerializeField] private float orderIconRowHorizontalSpacingDownLeft;
+    [Tooltip("하단 오른쪽일 때 아이콘 가로 간격. 0이면 공통")]
+    [SerializeField] private float orderIconRowHorizontalSpacingDownRight;
+
     [Header("Customer mount (UI)")]
     [Tooltip("손님 프리팹(NPC)의 부모. 비우면 씬에서 Panel_Maker_Center/Table 을 찾습니다. CustomerSlots가 아닌 테이블 위에 붙습니다.")]
     [SerializeField] private Transform customerMountParent;
@@ -662,12 +709,16 @@ public class CustomerManager : MonoBehaviour
         RectTransform bubbleRt = bubbleObj.GetComponent<RectTransform>();
         bubbleRt.anchoredPosition = ResolveSpeechBubbleAnchoredPosition(selectedSlot);
 
-        bubbleRt.sizeDelta = new Vector2(268f, 172f);
+        bubbleRt.sizeDelta = speechBubbleBoxSizeDelta;
 
         var vlg = bubbleObj.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
         vlg.childAlignment = TextAnchor.MiddleCenter;
-        vlg.spacing = 6f;
-        vlg.padding = new RectOffset(10, 10, 10, 10);
+        vlg.spacing = speechBubbleVerticalSpacing;
+        vlg.padding = new RectOffset(
+            speechBubblePaddingLeft,
+            speechBubblePaddingRight,
+            speechBubblePaddingTop,
+            speechBubblePaddingBottom);
         vlg.childControlWidth = false;
         vlg.childControlHeight = false;
         vlg.childForceExpandWidth = false;
@@ -677,28 +728,34 @@ public class CustomerManager : MonoBehaviour
         labelObj.transform.SetParent(bubbleObj.transform, false);
         UnityEngine.UI.Text labelTxt = labelObj.AddComponent<UnityEngine.UI.Text>();
         labelTxt.alignment = TextAnchor.MiddleCenter;
-        labelTxt.fontSize = 22;
+        labelTxt.fontSize = Mathf.RoundToInt(bubbleLabelFontSize);
         labelTxt.color = Color.black;
         labelTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         labelTxt.raycastTarget = false;
+        RectTransform labelRt = labelObj.GetComponent<RectTransform>();
+        labelRt.anchoredPosition = new Vector2(labelRt.anchoredPosition.x, bubbleLabelAnchoredOffsetY);
         var labelLe = labelObj.AddComponent<UnityEngine.UI.LayoutElement>();
-        labelLe.preferredWidth = 240f;
-        labelLe.preferredHeight = 28f;
+        labelLe.preferredWidth = bubbleLabelPreferredSize.x;
+        labelLe.preferredHeight = bubbleLabelPreferredSize.y;
 
         GameObject rowObj = new GameObject("OrderIconRow");
         rowObj.transform.SetParent(bubbleObj.transform, false);
         var hlg = rowObj.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
         hlg.childAlignment = TextAnchor.MiddleCenter;
-        hlg.spacing = 10;
+        hlg.spacing = ResolveOrderIconRowHorizontalSpacing(selectedSlot);
         hlg.childControlWidth = false;
         hlg.childControlHeight = false;
         hlg.childForceExpandWidth = false;
         hlg.childForceExpandHeight = false;
+        RectTransform rowRt = rowObj.GetComponent<RectTransform>();
+        rowRt.localScale = Vector3.one * ResolveOrderIconRowScale(selectedSlot);
+        rowRt.anchoredPosition = new Vector2(rowRt.anchoredPosition.x, ResolveOrderIconRowAnchoredY(selectedSlot));
         var rowLe = rowObj.AddComponent<UnityEngine.UI.LayoutElement>();
-        rowLe.preferredHeight = 48f;
-        rowLe.preferredWidth = 220f;
+        Vector2 rowPref = ResolveOrderIconRowPreferredSize(selectedSlot);
+        rowLe.preferredHeight = rowPref.y;
+        rowLe.preferredWidth = rowPref.x;
 
-        const float iconSize = 40f;
+        float iconSize = ResolveOrderIconSlotSize(selectedSlot);
         for (int i = 0; i < 3; i++)
         {
             GameObject slot = new GameObject($"Slot{i}");
@@ -715,6 +772,46 @@ public class CustomerManager : MonoBehaviour
         ApplyBubbleOrientationForSlot(bubbleRt, selectedSlot);
 
         return labelTxt;
+    }
+
+    private float ResolveOrderIconSlotSize(ServingManager.ServeDirection slot)
+    {
+        if (slot != ServingManager.ServeDirection.Down) return orderIconSlotSize;
+        if (thisSpawnDownSideIndex == 0)
+            return orderIconSlotSizeDownLeft > 0f ? orderIconSlotSizeDownLeft : orderIconSlotSize;
+        return orderIconSlotSizeDownRight > 0f ? orderIconSlotSizeDownRight : orderIconSlotSize;
+    }
+
+    private float ResolveOrderIconRowScale(ServingManager.ServeDirection slot)
+    {
+        float def = Mathf.Max(0.01f, orderIconRowScale);
+        if (slot != ServingManager.ServeDirection.Down) return def;
+        if (thisSpawnDownSideIndex == 0)
+            return orderIconRowScaleDownLeft > 0f ? orderIconRowScaleDownLeft : def;
+        return orderIconRowScaleDownRight > 0f ? orderIconRowScaleDownRight : def;
+    }
+
+    private float ResolveOrderIconRowAnchoredY(ServingManager.ServeDirection slot)
+    {
+        float baseY = orderIconRowAnchoredOffsetY;
+        if (slot != ServingManager.ServeDirection.Down) return baseY;
+        float extra = thisSpawnDownSideIndex == 0 ? orderIconRowExtraOffsetYDownLeft : orderIconRowExtraOffsetYDownRight;
+        return baseY + extra;
+    }
+
+    private Vector2 ResolveOrderIconRowPreferredSize(ServingManager.ServeDirection slot)
+    {
+        if (slot != ServingManager.ServeDirection.Down) return orderIconRowPreferredSize;
+        Vector2 v = thisSpawnDownSideIndex == 0 ? orderIconRowPreferredSizeDownLeft : orderIconRowPreferredSizeDownRight;
+        return v.sqrMagnitude > 0.0001f ? v : orderIconRowPreferredSize;
+    }
+
+    private float ResolveOrderIconRowHorizontalSpacing(ServingManager.ServeDirection slot)
+    {
+        if (slot != ServingManager.ServeDirection.Down) return orderIconRowHorizontalSpacing;
+        if (thisSpawnDownSideIndex == 0)
+            return orderIconRowHorizontalSpacingDownLeft > 0f ? orderIconRowHorizontalSpacingDownLeft : orderIconRowHorizontalSpacing;
+        return orderIconRowHorizontalSpacingDownRight > 0f ? orderIconRowHorizontalSpacingDownRight : orderIconRowHorizontalSpacing;
     }
 
     /// <summary>
