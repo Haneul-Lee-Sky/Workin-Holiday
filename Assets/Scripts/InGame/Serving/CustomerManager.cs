@@ -97,6 +97,8 @@ public class CustomerManager : MonoBehaviour
     [SerializeField] private float bubbleLabelFontSize = 22f;
     [Tooltip("아이콘 행만 통째로 스케일 (1 = 기본)")]
     [SerializeField] private float orderIconRowScale = 1f;
+    [Tooltip("아이콘 행을 말풍선 안에서 좌·우로 미세 이동 (앵커드 X)")]
+    [SerializeField] private float orderIconRowAnchoredOffsetX;
     [Tooltip("아이콘 행을 말풍선 안에서 위·아래로 미세 이동 (앵커드 Y)")]
     [SerializeField] private float orderIconRowAnchoredOffsetY;
     [Tooltip("상단 라벨을 위·아래로 미세 이동 (앵커드 Y)")]
@@ -107,6 +109,10 @@ public class CustomerManager : MonoBehaviour
     [SerializeField] private float orderIconSlotSizeDownLeft;
     [Tooltip("하단 오른쪽 배치(번갈 1번)일 때 아이콘 칸 한 변. 0이면 공통")]
     [SerializeField] private float orderIconSlotSizeDownRight;
+    [Tooltip("하단 왼쪽일 때 아이콘 행 X = 공통 오프셋 + 이 값")]
+    [SerializeField] private float orderIconRowExtraOffsetXDownLeft;
+    [Tooltip("하단 오른쪽일 때 아이콘 행 X = 공통 오프셋 + 이 값")]
+    [SerializeField] private float orderIconRowExtraOffsetXDownRight;
     [Tooltip("하단 왼쪽일 때 아이콘 행 Y = 공통 오프셋 + 이 값")]
     [SerializeField] private float orderIconRowExtraOffsetYDownLeft;
     [Tooltip("하단 오른쪽일 때 아이콘 행 Y = 공통 오프셋 + 이 값")]
@@ -749,7 +755,7 @@ public class CustomerManager : MonoBehaviour
         hlg.childForceExpandHeight = false;
         RectTransform rowRt = rowObj.GetComponent<RectTransform>();
         rowRt.localScale = Vector3.one * ResolveOrderIconRowScale(selectedSlot);
-        rowRt.anchoredPosition = new Vector2(rowRt.anchoredPosition.x, ResolveOrderIconRowAnchoredY(selectedSlot));
+        rowRt.anchoredPosition = ResolveOrderIconRowAnchoredOffset(selectedSlot);
         var rowLe = rowObj.AddComponent<UnityEngine.UI.LayoutElement>();
         Vector2 rowPref = ResolveOrderIconRowPreferredSize(selectedSlot);
         rowLe.preferredHeight = rowPref.y;
@@ -791,12 +797,24 @@ public class CustomerManager : MonoBehaviour
         return orderIconRowScaleDownRight > 0f ? orderIconRowScaleDownRight : def;
     }
 
-    private float ResolveOrderIconRowAnchoredY(ServingManager.ServeDirection slot)
+    private Vector2 ResolveOrderIconRowAnchoredOffset(ServingManager.ServeDirection slot)
     {
-        float baseY = orderIconRowAnchoredOffsetY;
-        if (slot != ServingManager.ServeDirection.Down) return baseY;
-        float extra = thisSpawnDownSideIndex == 0 ? orderIconRowExtraOffsetYDownLeft : orderIconRowExtraOffsetYDownRight;
-        return baseY + extra;
+        float x = orderIconRowAnchoredOffsetX;
+        float y = orderIconRowAnchoredOffsetY;
+        if (slot == ServingManager.ServeDirection.Down)
+        {
+            if (thisSpawnDownSideIndex == 0)
+            {
+                x += orderIconRowExtraOffsetXDownLeft;
+                y += orderIconRowExtraOffsetYDownLeft;
+            }
+            else
+            {
+                x += orderIconRowExtraOffsetXDownRight;
+                y += orderIconRowExtraOffsetYDownRight;
+            }
+        }
+        return new Vector2(x, y);
     }
 
     private Vector2 ResolveOrderIconRowPreferredSize(ServingManager.ServeDirection slot)
