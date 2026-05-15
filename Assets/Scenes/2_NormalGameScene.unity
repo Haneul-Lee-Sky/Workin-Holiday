@@ -1421,10 +1421,10 @@ MonoBehaviour:
   orderToppingIconRedBean: {fileID: 5693600146865101926, guid: ff659a1d17675344d8a0dc108549ef1c, type: 3}
   orderToppingIconMilk: {fileID: -8595150884068151174, guid: ff659a1d17675344d8a0dc108549ef1c, type: 3}
   orderToppingIconFruit: {fileID: 1565466356606959809, guid: ff659a1d17675344d8a0dc108549ef1c, type: 3}
-  speechBubbleAnchoredPositionLeft: {x: 0, y: 140}
-  speechBubbleAnchoredPositionRight: {x: 0, y: 140}
-  speechBubbleAnchoredPositionDownLeft: {x: -200, y: 10}
-  speechBubbleAnchoredPositionDownRight: {x: 200, y: 10}
+  speechBubbleAnchoredPositionLeft: {x: 0, y: 300}
+  speechBubbleAnchoredPositionRight: {x: 0, y: 300}
+  speechBubbleAnchoredPositionDownLeft: {x: -150, y: 10}
+  speechBubbleAnchoredPositionDownRight: {x: 150, y: 10}
   speechBubbleHostLocalOffsetLeft: {x: 0, y: 0, z: 0}
   speechBubbleHostLocalOffsetRight: {x: 0, y: 0, z: 0}
   speechBubbleHostLocalOffsetDownLeft: {x: 0, y: 0, z: 0}
@@ -1436,9 +1436,36 @@ MonoBehaviour:
   speechBubbleFlipYForDownRight: 0
   speechBubbleRotationZForDownLeft: 0
   speechBubbleRotationZForDownRight: 0
+  speechBubbleBoxSizeDelta: {x: 200, y: 250}
+  speechBubbleVerticalSpacing: 6
+  speechBubblePaddingLeft: 10
+  speechBubblePaddingRight: 10
+  speechBubblePaddingTop: 10
+  speechBubblePaddingBottom: 50
+  orderIconSlotSize: 75
+  orderIconRowHorizontalSpacing: 10
+  orderIconRowPreferredSize: {x: 220, y: 48}
+  bubbleLabelPreferredSize: {x: 240, y: 28}
+  bubbleLabelFontSize: 50
+  orderIconRowScale: 1.75
+  orderIconRowAnchoredOffsetX: 0
+  orderIconRowAnchoredOffsetY: 0
+  bubbleLabelAnchoredOffsetY: 0
+  orderIconSlotSizeDownLeft: 0
+  orderIconSlotSizeDownRight: 0
+  orderIconRowExtraOffsetXDownLeft: 1000
+  orderIconRowExtraOffsetXDownRight: 1000
+  orderIconRowExtraOffsetYDownLeft: 0
+  orderIconRowExtraOffsetYDownRight: 0
+  orderIconRowScaleDownLeft: 0
+  orderIconRowScaleDownRight: 0
+  orderIconRowPreferredSizeDownLeft: {x: 0, y: 0}
+  orderIconRowPreferredSizeDownRight: {x: 0, y: 0}
+  orderIconRowHorizontalSpacingDownLeft: 0
+  orderIconRowHorizontalSpacingDownRight: 0
   customerMountParent: {fileID: 0}
   approachDistanceFromTable: 1.2
-  stopOffsetFromTableEdge: 0.28
+  stopOffsetFromTableEdge: 0.35
   customerWaitTime: 15
 --- !u!114 &1213537354
 MonoBehaviour:
