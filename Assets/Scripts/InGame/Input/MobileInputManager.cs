@@ -98,7 +98,7 @@ public class MobileInputManager : MonoBehaviour
     {
         // Scene may contain multiple IceMachine components (some disabled).
         // Prefer the one that is active+enabled so input updates the visible UI.
-        var all = FindObjectsByType<IceMachine>(FindObjectsInactive.Include);
+        var all = FindObjectsByType<IceMachine>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         IceMachine fallback = null;
         for (int i = 0; i < all.Length; i++)
         {

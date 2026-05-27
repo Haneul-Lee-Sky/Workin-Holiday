@@ -29,9 +29,6 @@ public class ButtonPressFeedback : MonoBehaviour,
     /// <summary>Awake가 끝나기 전에 컴포넌트만 제거되면 originalColor 등이 기본값이라 OnDisable에서 그래픽을 망가뜨릴 수 있음</summary>
     private bool visualsInitialized;
 
-    /// <summary>Awake가 끝나기 전에 컴포넌트만 제거되면 originalColor 등이 기본값이라 OnDisable에서 그래픽을 망가뜨릴 수 있음</summary>
-    private bool visualsInitialized;
-
     private void Awake()
     {
         button = GetComponent<Button>();
