@@ -125,13 +125,13 @@ public class IceMachine : MonoBehaviour
 
     private void Start()
     {
-        // 레이아웃 리빌드 후에도 토핑 버튼 색/컴포넌트 상태를 한 번 더 맞춤
+        // 다른 Awake가 토핑 쪽을 건드린 뒤에도 한 번 더 맞춤 + 플레이 중 스크립트 저장 직후 재진입 시에도 반영
         RefreshToppingButtonPresentation();
     }
 
     /// <summary>
-    /// 토핑 버튼은 CanvasGroup 알파만으로 반투명을 표현합니다.
-    /// ButtonPressFeedback(눌림 어둡게)은 레이아웃·스케일과 겹치면 왼쪽 팥만 흐려 보이기 쉬워 제거합니다.
+    /// 토핑 버튼은 CanvasGroup 알파만으로 비활성/반투명을 표현합니다.
+    /// ButtonPressFeedback / ColorTint 전환이 Image.color를 덮어쓰면 팥만 유난히 흐려 보일 수 있어 제거·고정합니다.
     /// </summary>
     private void RefreshToppingButtonPresentation()
     {
@@ -148,6 +148,7 @@ public class IceMachine : MonoBehaviour
     {
         if (btn == null) return;
 
+        // targetGraphic + 이 버튼 오브젝트 하위의 Graphic만 정규화 (형제/부모 패널 전체 스캔은 하지 않음)
         var graphics = new HashSet<Graphic>();
         if (btn.targetGraphic != null)
             graphics.Add(btn.targetGraphic);
@@ -162,6 +163,8 @@ public class IceMachine : MonoBehaviour
             g.color = new Color(c.r, c.g, c.b, 1f);
         }
 
+        // Transition.None은 환경에 따라 그래픽 알파가 깨지는 사례가 있어,
+        // ColorTint를 쓰되 Normal/Pressed 등을 모두 같은 색으로 맞춰 "틴트 없음"과 동일하게 둡니다.
         ApplyNeutralColorTint(btn);
 
         var fb = btn.GetComponent<ButtonPressFeedback>();
@@ -186,6 +189,9 @@ public class IceMachine : MonoBehaviour
         btn.transition = Selectable.Transition.ColorTint;
     }
 
+    /// <summary>
+    /// 토핑 전용: ButtonPressFeedback은 제거만 하고 새로 붙이지 않습니다.
+    /// </summary>
     private static void StripPressFeedbackFromToppingButton(Button btn)
     {
         if (btn == null) return;
@@ -199,6 +205,7 @@ public class IceMachine : MonoBehaviour
         var feedback = btn.GetComponent<ButtonPressFeedback>();
         if (feedback != null)
         {
+            // 제거 직전 눌림 상태를 풀어 두면 OnDisable/원복이 안전합니다.
             feedback.ForceRelease();
             UnityEngine.Object.DestroyImmediate(feedback);
         }
@@ -214,6 +221,8 @@ public class IceMachine : MonoBehaviour
         if (toppingsCanvasGroup != null)
         {
             toppingsCanvasGroup.alpha = ready ? toppingsAlphaWhenReady : toppingsAlphaWhileBuildingIce;
+            // interactable을 ready에 따라 껐다 켜면 Unity의 Disabled tint(DisabledColor 알파)이 적용될 수 있어
+            // "비활성 -> 투명"이 아닌 "알파는 CanvasGroup alpha로만" 제어하도록 interactable은 항상 true로 둡니다.
             toppingsCanvasGroup.interactable = true;
             toppingsCanvasGroup.blocksRaycasts = ready;
 
@@ -221,6 +230,7 @@ public class IceMachine : MonoBehaviour
             if (milkButton != null) milkButton.interactable = true;
             if (fruitButton != null) fruitButton.interactable = true;
 
+            // 토핑 아이콘은 ButtonPressFeedback 없이 운용 — Graphic 알파만 정규화
             NormalizeButtonGraphic(redBeanButton);
             NormalizeButtonGraphic(milkButton);
             NormalizeButtonGraphic(fruitButton);

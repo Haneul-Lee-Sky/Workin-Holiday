@@ -26,6 +26,8 @@ public class ButtonPressFeedback : MonoBehaviour,
     private Vector3 originalScale;
     private Color originalColor;
     private bool isPressed;
+    /// <summary>Awake가 끝나기 전에 컴포넌트만 제거되면 originalColor 등이 기본값이라 OnDisable에서 그래픽을 망가뜨릴 수 있음</summary>
+    private bool visualsInitialized;
 
     /// <summary>Awake가 끝나기 전에 컴포넌트만 제거되면 originalColor 등이 기본값이라 OnDisable에서 그래픽을 망가뜨릴 수 있음</summary>
     private bool visualsInitialized;
@@ -44,6 +46,7 @@ public class ButtonPressFeedback : MonoBehaviour,
 
     private void OnEnable()
     {
+        // HorizontalLayoutGroup 등 적용 전 Awake에서 scale이 (0,0,0)으로 잡히는 경우가 있어 재캐시합니다.
         if (button == null) button = GetComponent<Button>();
         if (targetGraphic == null && button != null)
             targetGraphic = button.targetGraphic != null ? button.targetGraphic : GetComponent<Graphic>();
@@ -76,7 +79,9 @@ public class ButtonPressFeedback : MonoBehaviour,
 
     private void OnDisable()
     {
+        // Awake 전에 DestroyImmediate 되면 originalColor=(0,0,0,0) 등으로 Image를 망가뜨릴 수 있음
         if (!visualsInitialized) return;
+        // 비활성화 시에도 눌림 색/스케일이 남지 않도록 항상 원복
         ResetVisualToOriginal();
     }
 
@@ -134,6 +139,7 @@ public class ButtonPressFeedback : MonoBehaviour,
     /// </summary>
     public void RefreshOriginalColorFromTarget()
     {
+        // 눌림 중이 아닐 때만 스케일 기준을 갱신 (눌린 축소 스케일을 원본으로 저장하지 않도록)
         if (!isPressed)
         {
             var s = transform.localScale;
